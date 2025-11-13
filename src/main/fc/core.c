@@ -671,15 +671,16 @@ void handleInflightCalibrationStickPosition(void)
 
 static void updateInflightCalibrationState(void)
 {
-    if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {   // Copter is airborne and you are turning it off via boxarm : start measurement
-        InflightcalibratingA = 50;
-        AccInflightCalibrationArmed = false;
-    }
-    if (IS_RC_MODE_ACTIVE(BOXCALIB)) {      // Use the Calib Option to activate : Calib = TRUE measurement started, Land and Calib = 0 measurement stored
+    // NOTE: In-flight ACC calibration is now triggered exclusively by the BOXCALIB AUX mode.
+    // This allows calibration to be started while armed without additional safety checks.
+    // The legacy AccInflightCalibrationArmed + ARM switch path has been removed.
+    
+    if (IS_RC_MODE_ACTIVE(BOXCALIB)) {      // BOXCALIB active: start measurement (works while armed or disarmed)
         if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone)
             InflightcalibratingA = 50;
         AccInflightCalibrationActive = true;
     } else if (AccInflightCalibrationMeasurementDone && !ARMING_FLAG(ARMED)) {
+        // Save calibration to EEPROM after landing when BOXCALIB is deactivated
         AccInflightCalibrationMeasurementDone = false;
         AccInflightCalibrationSavetoEEProm = true;
     }
