@@ -671,19 +671,33 @@ void handleInflightCalibrationStickPosition(void)
 
 static void updateInflightCalibrationState(void)
 {
-    // NOTE: In-flight ACC calibration is now triggered exclusively by the BOXCALIB AUX mode.
-    // This allows calibration to be started while armed without additional safety checks.
-    // The legacy AccInflightCalibrationArmed + ARM switch path has been removed.
+    // NOTE: In-flight ACC calibration is triggered exclusively by the BOXCALIB AUX mode.
+    // BOXCALIB rising edge (OFF->ON) starts a new calibration run (sets InflightcalibratingA = 50).
+    // BOXCALIB falling edge (ON->OFF) saves completed calibration to EEPROM.
+    // Multiple calibration cycles can be performed per power-on without disarming.
+    // No disarm guard: calibration can be saved while armed or disarmed.
     
-    if (IS_RC_MODE_ACTIVE(BOXCALIB)) {      // BOXCALIB active: start measurement (works while armed or disarmed)
-        if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone)
-            InflightcalibratingA = 50;
+    static bool prevCalib = false;
+    bool curCalib = IS_RC_MODE_ACTIVE(BOXCALIB);
+    
+    if (curCalib && !prevCalib) {
+        // Rising edge: BOXCALIB toggled ON, start new calibration cycle
+        InflightcalibratingA = 50;
         AccInflightCalibrationActive = true;
-    } else if (AccInflightCalibrationMeasurementDone && !ARMING_FLAG(ARMED)) {
-        // Save calibration to EEPROM after landing when BOXCALIB is deactivated
         AccInflightCalibrationMeasurementDone = false;
-        AccInflightCalibrationSavetoEEProm = true;
     }
+    
+    if (!curCalib && prevCalib) {
+        // Falling edge: BOXCALIB toggled OFF
+        if (AccInflightCalibrationMeasurementDone) {
+            // Calibration completed, schedule EEPROM save (no disarm guard)
+            AccInflightCalibrationSavetoEEProm = true;
+            AccInflightCalibrationMeasurementDone = false;
+        }
+        AccInflightCalibrationActive = false;
+    }
+    
+    prevCalib = curCalib;
 }
 
 #if defined(USE_GPS) || defined(USE_MAG)
