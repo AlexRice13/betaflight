@@ -260,11 +260,9 @@ void processRcStickPositions(void)
         return;
     }
 
-    if (featureIsEnabled(FEATURE_INFLIGHT_ACC_CAL) && (rcSticks == THR_LO + YAW_LO + PIT_HI + ROL_HI)) {
-        // Inflight ACC Calibration
-        handleInflightCalibrationStickPosition();
-        return;
-    }
+    // NOTE: Inflight ACC calibration is now triggered exclusively by the BOXCALIB AUX mode.
+    // The stick command trigger (THR_LO + YAW_LO + PIT_HI + ROL_HI) has been removed.
+    // See updateInflightCalibrationState() in core.c for the BOXCALIB implementation.
 
     // Change PID profile
     switch (rcSticks) {
