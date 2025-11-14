@@ -653,6 +653,21 @@ bool AccInflightCalibrationSavetoEEProm = false;
 bool AccInflightCalibrationActive = false;
 uint16_t InflightcalibratingA = 0;
 
+#define INFLIGHT_ACC_CAL_WINDOW_MIN 10
+#define INFLIGHT_ACC_CAL_WINDOW_MAX 200
+
+static uint8_t getInflightAccCalWindow(void)
+{
+    uint8_t window = accelerometerConfig()->inflight_acc_cal_window;
+    // Clamp to valid range
+    if (window < INFLIGHT_ACC_CAL_WINDOW_MIN) {
+        window = INFLIGHT_ACC_CAL_WINDOW_MIN;
+    } else if (window > INFLIGHT_ACC_CAL_WINDOW_MAX) {
+        window = INFLIGHT_ACC_CAL_WINDOW_MAX;
+    }
+    return window;
+}
+
 void handleInflightCalibrationStickPosition(void)
 {
     if (AccInflightCalibrationMeasurementDone) {
@@ -672,7 +687,7 @@ void handleInflightCalibrationStickPosition(void)
 static void updateInflightCalibrationState(void)
 {
     // NOTE: In-flight ACC calibration is triggered exclusively by the BOXCALIB AUX mode.
-    // BOXCALIB rising edge (OFF->ON) starts a new calibration run (sets InflightcalibratingA = 50).
+    // BOXCALIB rising edge (OFF->ON) starts a new calibration run (sets InflightcalibratingA to configured window length).
     // BOXCALIB falling edge (ON->OFF) saves completed calibration to EEPROM.
     // Multiple calibration cycles can be performed per power-on without disarming.
     // No disarm guard: calibration can be saved while armed or disarmed.
@@ -682,7 +697,7 @@ static void updateInflightCalibrationState(void)
     
     if (curCalib && !prevCalib) {
         // Rising edge: BOXCALIB toggled ON, start new calibration cycle
-        InflightcalibratingA = 50;
+        InflightcalibratingA = getInflightAccCalWindow();
         AccInflightCalibrationActive = true;
         AccInflightCalibrationMeasurementDone = false;
     }

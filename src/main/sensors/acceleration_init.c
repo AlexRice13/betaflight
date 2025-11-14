@@ -120,17 +120,33 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
         .acc_lpf_hz = 25, // ATTITUDE/IMU runs at 100Hz (acro) or 500Hz (level modes) so we need to set 50 Hz (or lower) to avoid aliasing
         .acc_hardware = ACC_DEFAULT,
         .acc_high_fsr = false,
+        .inflight_acc_cal_window = 50, // default window length preserves existing behavior
     );
     resetRollAndPitchTrims(&instance->accelerometerTrims);
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 2);
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
 extern bool AccInflightCalibrationSavetoEEProm;
 extern bool AccInflightCalibrationActive;
+
+#define INFLIGHT_ACC_CAL_WINDOW_MIN 10
+#define INFLIGHT_ACC_CAL_WINDOW_MAX 200
+
+static uint8_t getInflightAccCalWindow(void)
+{
+    uint8_t window = accelerometerConfig()->inflight_acc_cal_window;
+    // Clamp to valid range
+    if (window < INFLIGHT_ACC_CAL_WINDOW_MIN) {
+        window = INFLIGHT_ACC_CAL_WINDOW_MIN;
+    } else if (window > INFLIGHT_ACC_CAL_WINDOW_MAX) {
+        window = INFLIGHT_ACC_CAL_WINDOW_MAX;
+    }
+    return window;
+}
 
 static bool accDetect(accDev_t *dev, accelerationSensor_e accHardwareToUse)
 {
@@ -445,9 +461,15 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int32_t b[3];
     static int16_t accZero_saved[3] = { 0, 0, 0 };
     static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
+    static uint8_t windowLength = 0;
+
+    // Get the configured window length at start of calibration
+    if (windowLength == 0 || InflightcalibratingA == 0) {
+        windowLength = getInflightAccCalWindow();
+    }
 
     // Saving old zeropoints before measurement
-    if (InflightcalibratingA == 50) {
+    if (InflightcalibratingA == windowLength) {
         accZero_saved[X] = accelerationRuntime.accelerationTrims->raw[X];
         accZero_saved[Y] = accelerationRuntime.accelerationTrims->raw[Y];
         accZero_saved[Z] = accelerationRuntime.accelerationTrims->raw[Z];
@@ -456,10 +478,10 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     }
     if (InflightcalibratingA > 0) {
         for (int axis = 0; axis < 3; axis++) {
-            // Reset a[axis] at start of calibration
-            if (InflightcalibratingA == 50)
+            // Reset b[axis] at start of calibration
+            if (InflightcalibratingA == windowLength)
                 b[axis] = 0;
-            // Sum up 50 readings
+            // Sum up windowLength readings
             b[axis] += acc.accADC.v[axis];
             // Clear global variables for next reading
             acc.accADC.v[axis] = 0;
@@ -482,9 +504,9 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
     if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
         AccInflightCalibrationSavetoEEProm = false;
-        accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
-        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
-        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 50 - acc.dev.acc_1G;    // for nunchuck 200=1G
+        accelerationRuntime.accelerationTrims->raw[X] = b[X] / windowLength;
+        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / windowLength;
+        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / windowLength - acc.dev.acc_1G;    // for nunchuck 200=1G
 
         resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();
