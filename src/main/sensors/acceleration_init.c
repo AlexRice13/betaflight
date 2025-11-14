@@ -504,6 +504,10 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
     if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
         AccInflightCalibrationSavetoEEProm = false;
+        // Ensure windowLength is valid before division
+        if (windowLength == 0) {
+            windowLength = getInflightAccCalWindow();
+        }
         accelerationRuntime.accelerationTrims->raw[X] = b[X] / windowLength;
         accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / windowLength;
         accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / windowLength - acc.dev.acc_1G;    // for nunchuck 200=1G
