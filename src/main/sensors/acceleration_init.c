@@ -462,60 +462,67 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int16_t accZero_saved[3] = { 0, 0, 0 };
     static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
     static uint8_t windowLength = 0;
+    static uint16_t sampleCount = 0;
 
     // Get the configured window length at start of calibration
-    if (windowLength == 0 || InflightcalibratingA == 0) {
+    if (windowLength == 0 || !AccInflightCalibrationActive) {
         windowLength = getInflightAccCalWindow();
     }
 
-    // Saving old zeropoints before measurement
-    if (InflightcalibratingA == windowLength) {
+    // When calibration becomes active, save old calibration values
+    if (AccInflightCalibrationActive && sampleCount == 0) {
         accZero_saved[X] = accelerationRuntime.accelerationTrims->raw[X];
         accZero_saved[Y] = accelerationRuntime.accelerationTrims->raw[Y];
         accZero_saved[Z] = accelerationRuntime.accelerationTrims->raw[Z];
         angleTrim_saved.values.roll = rollAndPitchTrims->values.roll;
         angleTrim_saved.values.pitch = rollAndPitchTrims->values.pitch;
-    }
-    if (InflightcalibratingA > 0) {
+        // Reset accumulators
         for (int axis = 0; axis < 3; axis++) {
-            // Reset b[axis] at start of calibration
-            if (InflightcalibratingA == windowLength)
-                b[axis] = 0;
-            // Sum up windowLength readings
-            b[axis] += acc.accADC.v[axis];
-            // Clear global variables for next reading
-            acc.accADC.v[axis] = 0;
-            accelerationRuntime.accelerationTrims->raw[axis] = 0;
+            b[axis] = 0;
         }
-        // all values are measured
-        if (InflightcalibratingA == 1) {
-            AccInflightCalibrationActive = false;
-            AccInflightCalibrationMeasurementDone = true;
-            beeper(BEEPER_ACC_CALIBRATION); // indicate end of calibration
-            // recover saved values to maintain current flight behaviour until new values are transferred
-            accelerationRuntime.accelerationTrims->raw[X] = accZero_saved[X];
-            accelerationRuntime.accelerationTrims->raw[Y] = accZero_saved[Y];
-            accelerationRuntime.accelerationTrims->raw[Z] = accZero_saved[Z];
-            rollAndPitchTrims->values.roll = angleTrim_saved.values.roll;
-            rollAndPitchTrims->values.pitch = angleTrim_saved.values.pitch;
-        }
-        InflightcalibratingA--;
     }
-    // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
-    if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
-        AccInflightCalibrationSavetoEEProm = false;
-        // Ensure windowLength is valid before division
-        if (windowLength == 0) {
-            windowLength = getInflightAccCalWindow();
-        }
-        accelerationRuntime.accelerationTrims->raw[X] = b[X] / windowLength;
-        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / windowLength;
-        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / windowLength - acc.dev.acc_1G;    // for nunchuck 200=1G
 
+    // Continuous calibration: collect samples while BOXCALIB is ON
+    if (AccInflightCalibrationActive) {
+        // Accumulate samples
+        for (int axis = 0; axis < 3; axis++) {
+            b[axis] += acc.accADC.v[axis];
+        }
+        sampleCount++;
+
+        // When we have collected windowLength samples, calculate and apply new calibration
+        if (sampleCount >= windowLength) {
+            // Calculate average and apply continuously to acc trims
+            accelerationRuntime.accelerationTrims->raw[X] = b[X] / windowLength;
+            accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / windowLength;
+            accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / windowLength - acc.dev.acc_1G;
+
+            // Reset accumulators for next window
+            for (int axis = 0; axis < 3; axis++) {
+                b[axis] = 0;
+            }
+            sampleCount = 0;
+            
+            // Mark that we have at least one calibration measurement
+            AccInflightCalibrationMeasurementDone = true;
+        }
+
+        // Don't clear acc.accADC values - they're needed for flight control
+    } else {
+        // Calibration not active, reset sample count
+        sampleCount = 0;
+    }
+
+    // Save calibration to EEPROM when BOXCALIB is turned OFF
+    if (AccInflightCalibrationSavetoEEProm) {
+        AccInflightCalibrationSavetoEEProm = false;
+        
+        // Current trims are already applied, just save them
         resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();
 
         saveConfigAndNotify();
+        beeper(BEEPER_ACC_CALIBRATION); // indicate calibration saved
     }
 }
 
