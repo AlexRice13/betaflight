@@ -653,21 +653,6 @@ bool AccInflightCalibrationSavetoEEProm = false;
 bool AccInflightCalibrationActive = false;
 uint16_t InflightcalibratingA = 0;
 
-#define INFLIGHT_ACC_CAL_WINDOW_MIN 10
-#define INFLIGHT_ACC_CAL_WINDOW_MAX 200
-
-static uint8_t getInflightAccCalWindow(void)
-{
-    uint8_t window = accelerometerConfig()->inflight_acc_cal_window;
-    // Clamp to valid range
-    if (window < INFLIGHT_ACC_CAL_WINDOW_MIN) {
-        window = INFLIGHT_ACC_CAL_WINDOW_MIN;
-    } else if (window > INFLIGHT_ACC_CAL_WINDOW_MAX) {
-        window = INFLIGHT_ACC_CAL_WINDOW_MAX;
-    }
-    return window;
-}
-
 void handleInflightCalibrationStickPosition(void)
 {
     if (AccInflightCalibrationMeasurementDone) {

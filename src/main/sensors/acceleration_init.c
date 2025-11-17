@@ -458,9 +458,9 @@ void performAccelerometerCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 
 void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 {
+    UNUSED(rollAndPitchTrims);
+    
     static int32_t b[3];
-    static int16_t accZero_saved[3] = { 0, 0, 0 };
-    static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
     static uint8_t windowLength = 0;
     static uint16_t sampleCount = 0;
 
@@ -469,13 +469,8 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
         windowLength = getInflightAccCalWindow();
     }
 
-    // When calibration becomes active, save old calibration values
+    // When calibration becomes active, reset accumulators
     if (AccInflightCalibrationActive && sampleCount == 0) {
-        accZero_saved[X] = accelerationRuntime.accelerationTrims->raw[X];
-        accZero_saved[Y] = accelerationRuntime.accelerationTrims->raw[Y];
-        accZero_saved[Z] = accelerationRuntime.accelerationTrims->raw[Z];
-        angleTrim_saved.values.roll = rollAndPitchTrims->values.roll;
-        angleTrim_saved.values.pitch = rollAndPitchTrims->values.pitch;
         // Reset accumulators
         for (int axis = 0; axis < 3; axis++) {
             b[axis] = 0;
@@ -518,7 +513,6 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
         AccInflightCalibrationSavetoEEProm = false;
         
         // Current trims are already applied, just save them
-        resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();
 
         saveConfigAndNotify();
