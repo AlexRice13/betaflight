@@ -672,8 +672,8 @@ void handleInflightCalibrationStickPosition(void)
 static void updateInflightCalibrationState(void)
 {
     // NOTE: In-flight ACC calibration is triggered exclusively by the BOXCALIB AUX mode.
-    // BOXCALIB rising edge (OFF->ON) starts a new calibration run (sets InflightcalibratingA = 50).
-    // BOXCALIB falling edge (ON->OFF) saves completed calibration to EEPROM.
+    // BOXCALIB ON: Continuously collects samples and applies calibration in real-time.
+    // BOXCALIB OFF: Saves the current calibration to EEPROM.
     // Multiple calibration cycles can be performed per power-on without disarming.
     // No disarm guard: calibration can be saved while armed or disarmed.
     
@@ -681,20 +681,19 @@ static void updateInflightCalibrationState(void)
     bool curCalib = IS_RC_MODE_ACTIVE(BOXCALIB);
     
     if (curCalib && !prevCalib) {
-        // Rising edge: BOXCALIB toggled ON, start new calibration cycle
-        InflightcalibratingA = 50;
+        // Rising edge: BOXCALIB toggled ON, start continuous calibration
         AccInflightCalibrationActive = true;
         AccInflightCalibrationMeasurementDone = false;
     }
     
     if (!curCalib && prevCalib) {
         // Falling edge: BOXCALIB toggled OFF
+        AccInflightCalibrationActive = false;
         if (AccInflightCalibrationMeasurementDone) {
-            // Calibration completed, schedule EEPROM save (no disarm guard)
+            // At least one calibration cycle completed, schedule EEPROM save
             AccInflightCalibrationSavetoEEProm = true;
             AccInflightCalibrationMeasurementDone = false;
         }
-        AccInflightCalibrationActive = false;
     }
     
     prevCalib = curCalib;

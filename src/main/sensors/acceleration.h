@@ -87,6 +87,7 @@ typedef struct accelerometerConfig_s {
     bool acc_high_fsr;
     flightDynamicsTrims_t accZero;
     rollAndPitchTrims_t accelerometerTrims;
+    uint8_t inflight_acc_cal_window;        // number of samples for in-flight accelerometer calibration (default: 50, range: 10-200)
 } accelerometerConfig_t;
 
 PG_DECLARE(accelerometerConfig_t, accelerometerConfig);

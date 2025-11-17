@@ -120,17 +120,33 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
         .acc_lpf_hz = 25, // ATTITUDE/IMU runs at 100Hz (acro) or 500Hz (level modes) so we need to set 50 Hz (or lower) to avoid aliasing
         .acc_hardware = ACC_DEFAULT,
         .acc_high_fsr = false,
+        .inflight_acc_cal_window = 50, // default window length preserves existing behavior
     );
     resetRollAndPitchTrims(&instance->accelerometerTrims);
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 2);
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
 extern bool AccInflightCalibrationSavetoEEProm;
 extern bool AccInflightCalibrationActive;
+
+#define INFLIGHT_ACC_CAL_WINDOW_MIN 10
+#define INFLIGHT_ACC_CAL_WINDOW_MAX 200
+
+static uint8_t getInflightAccCalWindow(void)
+{
+    uint8_t window = accelerometerConfig()->inflight_acc_cal_window;
+    // Clamp to valid range
+    if (window < INFLIGHT_ACC_CAL_WINDOW_MIN) {
+        window = INFLIGHT_ACC_CAL_WINDOW_MIN;
+    } else if (window > INFLIGHT_ACC_CAL_WINDOW_MAX) {
+        window = INFLIGHT_ACC_CAL_WINDOW_MAX;
+    }
+    return window;
+}
 
 static bool accDetect(accDev_t *dev, accelerationSensor_e accHardwareToUse)
 {
@@ -442,54 +458,65 @@ void performAccelerometerCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 
 void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 {
+    UNUSED(rollAndPitchTrims);
+    
     static int32_t b[3];
-    static int16_t accZero_saved[3] = { 0, 0, 0 };
-    static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
+    static uint8_t windowLength = 0;
+    static uint16_t sampleCount = 0;
 
-    // Saving old zeropoints before measurement
-    if (InflightcalibratingA == 50) {
-        accZero_saved[X] = accelerationRuntime.accelerationTrims->raw[X];
-        accZero_saved[Y] = accelerationRuntime.accelerationTrims->raw[Y];
-        accZero_saved[Z] = accelerationRuntime.accelerationTrims->raw[Z];
-        angleTrim_saved.values.roll = rollAndPitchTrims->values.roll;
-        angleTrim_saved.values.pitch = rollAndPitchTrims->values.pitch;
+    // Get the configured window length at start of calibration
+    if (windowLength == 0 || !AccInflightCalibrationActive) {
+        windowLength = getInflightAccCalWindow();
     }
-    if (InflightcalibratingA > 0) {
+
+    // When calibration becomes active, reset accumulators
+    if (AccInflightCalibrationActive && sampleCount == 0) {
+        // Reset accumulators
         for (int axis = 0; axis < 3; axis++) {
-            // Reset a[axis] at start of calibration
-            if (InflightcalibratingA == 50)
-                b[axis] = 0;
-            // Sum up 50 readings
-            b[axis] += acc.accADC.v[axis];
-            // Clear global variables for next reading
-            acc.accADC.v[axis] = 0;
-            accelerationRuntime.accelerationTrims->raw[axis] = 0;
+            b[axis] = 0;
         }
-        // all values are measured
-        if (InflightcalibratingA == 1) {
-            AccInflightCalibrationActive = false;
-            AccInflightCalibrationMeasurementDone = true;
-            beeper(BEEPER_ACC_CALIBRATION); // indicate end of calibration
-            // recover saved values to maintain current flight behaviour until new values are transferred
-            accelerationRuntime.accelerationTrims->raw[X] = accZero_saved[X];
-            accelerationRuntime.accelerationTrims->raw[Y] = accZero_saved[Y];
-            accelerationRuntime.accelerationTrims->raw[Z] = accZero_saved[Z];
-            rollAndPitchTrims->values.roll = angleTrim_saved.values.roll;
-            rollAndPitchTrims->values.pitch = angleTrim_saved.values.pitch;
-        }
-        InflightcalibratingA--;
     }
-    // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
-    if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
-        AccInflightCalibrationSavetoEEProm = false;
-        accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
-        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
-        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 50 - acc.dev.acc_1G;    // for nunchuck 200=1G
 
-        resetRollAndPitchTrims(rollAndPitchTrims);
+    // Continuous calibration: collect samples while BOXCALIB is ON
+    if (AccInflightCalibrationActive) {
+        // Accumulate samples
+        for (int axis = 0; axis < 3; axis++) {
+            b[axis] += acc.accADC.v[axis];
+        }
+        sampleCount++;
+
+        // When we have collected windowLength samples, calculate and apply new calibration
+        if (sampleCount >= windowLength) {
+            // Calculate average and apply continuously to acc trims
+            accelerationRuntime.accelerationTrims->raw[X] = b[X] / windowLength;
+            accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / windowLength;
+            accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / windowLength - acc.dev.acc_1G;
+
+            // Reset accumulators for next window
+            for (int axis = 0; axis < 3; axis++) {
+                b[axis] = 0;
+            }
+            sampleCount = 0;
+            
+            // Mark that we have at least one calibration measurement
+            AccInflightCalibrationMeasurementDone = true;
+        }
+
+        // Don't clear acc.accADC values - they're needed for flight control
+    } else {
+        // Calibration not active, reset sample count
+        sampleCount = 0;
+    }
+
+    // Save calibration to EEPROM when BOXCALIB is turned OFF
+    if (AccInflightCalibrationSavetoEEProm) {
+        AccInflightCalibrationSavetoEEProm = false;
+        
+        // Current trims are already applied, just save them
         setConfigCalibrationCompleted();
 
         saveConfigAndNotify();
+        beeper(BEEPER_ACC_CALIBRATION); // indicate calibration saved
     }
 }
 
