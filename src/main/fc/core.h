@@ -68,9 +68,6 @@ extern const char * const osdLaunchControlModeNames[LAUNCH_CONTROL_MODE_COUNT];
 
 PG_DECLARE(throttleCorrectionConfig_t, throttleCorrectionConfig);
 
-union rollAndPitchTrims_u;
-void handleInflightCalibrationStickPosition(void);
-
 void resetArmingDisabled(void);
 
 void disarm(flightLogDisarmReason_e reason);
