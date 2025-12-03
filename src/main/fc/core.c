@@ -651,6 +651,7 @@ bool AccInflightCalibrationArmed = false;
 bool AccInflightCalibrationMeasurementDone = false;
 bool AccInflightCalibrationSavetoEEProm = false;
 bool AccInflightCalibrationActive = false;
+bool AccInflightCalibrationStarted = false;  // Set on rising edge to signal accumulator reset
 uint16_t InflightcalibratingA = 0;
 
 void handleInflightCalibrationStickPosition(void)
@@ -684,6 +685,7 @@ static void updateInflightCalibrationState(void)
         // Rising edge: BOXCALIB toggled ON, start continuous calibration
         AccInflightCalibrationActive = true;
         AccInflightCalibrationMeasurementDone = false;
+        AccInflightCalibrationStarted = true;  // Signal accumulator reset on new session
     }
     
     if (!curCalib && prevCalib) {

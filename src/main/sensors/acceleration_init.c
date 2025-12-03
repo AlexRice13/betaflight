@@ -132,6 +132,7 @@ extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
 extern bool AccInflightCalibrationSavetoEEProm;
 extern bool AccInflightCalibrationActive;
+extern bool AccInflightCalibrationStarted;
 
 #define INFLIGHT_ACC_CAL_WINDOW_MIN 10
 #define INFLIGHT_ACC_CAL_WINDOW_MAX 200
@@ -469,9 +470,10 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
         windowLength = getInflightAccCalWindow();
     }
 
-    // When calibration becomes active, reset accumulators
-    if (AccInflightCalibrationActive && sampleCount == 0) {
-        // Reset accumulators
+    // When a new calibration session starts (rising edge), reset accumulators
+    if (AccInflightCalibrationStarted) {
+        AccInflightCalibrationStarted = false;
+        sampleCount = 0;
         for (int axis = 0; axis < 3; axis++) {
             b[axis] = 0;
         }
