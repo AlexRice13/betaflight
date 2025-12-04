@@ -653,23 +653,9 @@ bool AccInflightCalibrationActive = false;
 
 static void updateInflightCalibrationState(void)
 {
-    // NOTE: In-flight ACC calibration is triggered exclusively by the BOXCALIB AUX mode.
-    // BOXCALIB ON: Continuously collects samples and applies calibration in real-time.
-    // BOXCALIB OFF: Saves the current calibration to EEPROM (if any measurement was done).
-    
-    static bool wasActive = false;
-    bool isActive = IS_RC_MODE_ACTIVE(BOXCALIB);
-    
-    // Simply track if calibration is currently active based on AUX switch state
-    AccInflightCalibrationActive = isActive;
-    
-    // When transitioning from active to inactive, trigger EEPROM save if measurement was done
-    if (wasActive && !isActive && AccInflightCalibrationMeasurementDone) {
-        AccInflightCalibrationSavetoEEProm = true;
-        AccInflightCalibrationMeasurementDone = false;
-    }
-    
-    wasActive = isActive;
+    // Simply set AccInflightCalibrationActive based on AUX switch state
+    // All edge detection and state tracking is done in the faster accelerometer task
+    AccInflightCalibrationActive = IS_RC_MODE_ACTIVE(BOXCALIB);
 }
 
 #if defined(USE_GPS) || defined(USE_MAG)

@@ -472,6 +472,12 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
             b[axis] = 0;
         }
     }
+    
+    // When calibration becomes inactive (AUX switch OFF), trigger EEPROM save if measurement was done
+    if (!AccInflightCalibrationActive && wasActive && AccInflightCalibrationMeasurementDone) {
+        AccInflightCalibrationSavetoEEProm = true;
+        AccInflightCalibrationMeasurementDone = false;
+    }
 
     // Collect samples and apply calibration while BOXCALIB AUX is ON
     if (AccInflightCalibrationActive) {
