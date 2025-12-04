@@ -505,8 +505,11 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
 
         // Don't clear acc.accADC values - they're needed for flight control
     } else {
-        // Calibration not active, reset sample count
+        // Calibration not active, reset sample count and accumulators
         sampleCount = 0;
+        for (int axis = 0; axis < 3; axis++) {
+            b[axis] = 0;
+        }
     }
 
     // Save calibration to EEPROM when BOXCALIB is turned OFF
