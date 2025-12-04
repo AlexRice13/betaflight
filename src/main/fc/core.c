@@ -650,37 +650,26 @@ void tryArm(void)
 bool AccInflightCalibrationMeasurementDone = false;
 bool AccInflightCalibrationSavetoEEProm = false;
 bool AccInflightCalibrationActive = false;
-bool AccInflightCalibrationStarted = false;  // Set on rising edge to signal accumulator reset
 
 static void updateInflightCalibrationState(void)
 {
     // NOTE: In-flight ACC calibration is triggered exclusively by the BOXCALIB AUX mode.
     // BOXCALIB ON: Continuously collects samples and applies calibration in real-time.
-    // BOXCALIB OFF: Saves the current calibration to EEPROM.
-    // Multiple calibration cycles can be performed per power-on without disarming.
-    // No disarm guard: calibration can be saved while armed or disarmed.
+    // BOXCALIB OFF: Saves the current calibration to EEPROM (if any measurement was done).
     
-    static bool prevCalib = false;
-    bool curCalib = IS_RC_MODE_ACTIVE(BOXCALIB);
+    static bool wasActive = false;
+    bool isActive = IS_RC_MODE_ACTIVE(BOXCALIB);
     
-    if (curCalib && !prevCalib) {
-        // Rising edge: BOXCALIB toggled ON, start continuous calibration
-        AccInflightCalibrationActive = true;
+    // Simply track if calibration is currently active based on AUX switch state
+    AccInflightCalibrationActive = isActive;
+    
+    // When transitioning from active to inactive, trigger EEPROM save if measurement was done
+    if (wasActive && !isActive && AccInflightCalibrationMeasurementDone) {
+        AccInflightCalibrationSavetoEEProm = true;
         AccInflightCalibrationMeasurementDone = false;
-        AccInflightCalibrationStarted = true;  // Signal accumulator reset on new session
     }
     
-    if (!curCalib && prevCalib) {
-        // Falling edge: BOXCALIB toggled OFF
-        AccInflightCalibrationActive = false;
-        if (AccInflightCalibrationMeasurementDone) {
-            // At least one calibration cycle completed, schedule EEPROM save
-            AccInflightCalibrationSavetoEEProm = true;
-            AccInflightCalibrationMeasurementDone = false;
-        }
-    }
-    
-    prevCalib = curCalib;
+    wasActive = isActive;
 }
 
 #if defined(USE_GPS) || defined(USE_MAG)
