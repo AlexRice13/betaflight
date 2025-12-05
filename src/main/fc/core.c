@@ -647,9 +647,11 @@ void tryArm(void)
 }
 
 // Automatic ACC Offset Calibration
-bool AccInflightCalibrationMeasurementDone = false;
-bool AccInflightCalibrationSavetoEEProm = false;
-bool AccInflightCalibrationActive = false;
+// These variables are shared between TASK_MAIN (low priority) and TASK_ACC (high priority)
+// They must be volatile to prevent compiler optimizations that could cache stale values
+volatile bool AccInflightCalibrationMeasurementDone = false;
+volatile bool AccInflightCalibrationSavetoEEProm = false;
+volatile bool AccInflightCalibrationActive = false;
 
 static void updateInflightCalibrationState(void)
 {

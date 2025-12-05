@@ -60,6 +60,7 @@
 #include "config/config.h"
 
 #include "drivers/bus_spi.h"
+#include "drivers/time.h"
 
 #include "fc/runtime_config.h"
 
@@ -128,12 +129,15 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
 
 PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
-extern bool AccInflightCalibrationMeasurementDone;
-extern bool AccInflightCalibrationSavetoEEProm;
-extern bool AccInflightCalibrationActive;
+// These variables are shared between TASK_MAIN (low priority) and TASK_ACC (high priority)
+// They must be volatile to ensure the high-priority task always reads fresh values
+extern volatile bool AccInflightCalibrationMeasurementDone;
+extern volatile bool AccInflightCalibrationSavetoEEProm;
+extern volatile bool AccInflightCalibrationActive;
 
 #define INFLIGHT_ACC_CAL_WINDOW_MIN 10
 #define INFLIGHT_ACC_CAL_WINDOW_MAX 200
+#define INFLIGHT_ACC_CAL_DEBOUNCE_MS 500
 
 static uint8_t getInflightAccCalWindow(void)
 {
@@ -462,25 +466,17 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int32_t b[3];
     static uint8_t windowLength = 0;
     static uint16_t sampleCount = 0;
-    static bool wasActive = false;
+    static uint32_t lastSaveTime = 0;
+    static bool calibrationSaved = false;
 
-    // When calibration becomes active (AUX switch ON), reset accumulators and re-read window length
-    if (AccInflightCalibrationActive && !wasActive) {
-        windowLength = getInflightAccCalWindow();
-        sampleCount = 0;
-        for (int axis = 0; axis < 3; axis++) {
-            b[axis] = 0;
-        }
-    }
-    
-    // When calibration becomes inactive (AUX switch OFF), trigger EEPROM save if measurement was done
-    if (!AccInflightCalibrationActive && wasActive && AccInflightCalibrationMeasurementDone) {
-        AccInflightCalibrationSavetoEEProm = true;
-        AccInflightCalibrationMeasurementDone = false;
-    }
+    // Get current window length on each call (in case config changed)
+    windowLength = getInflightAccCalWindow();
 
     // Collect samples and apply calibration while BOXCALIB AUX is ON
     if (AccInflightCalibrationActive) {
+        // Reset saved flag when calibration is active (allows new save when deactivated)
+        calibrationSaved = false;
+        
         // Accumulate samples
         for (int axis = 0; axis < 3; axis++) {
             b[axis] += acc.accADC.v[axis];
@@ -504,25 +500,28 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
             AccInflightCalibrationMeasurementDone = true;
         }
     } else {
-        // Calibration not active (AUX switch OFF), reset sample count and accumulators
+        // Calibration not active (AUX switch OFF)
+        // Save once if we have a valid measurement and haven't saved yet
+        if (AccInflightCalibrationMeasurementDone && !calibrationSaved) {
+            // Only save if we're outside the debounce window to prevent rapid re-saves
+            if (millis() - lastSaveTime >= INFLIGHT_ACC_CAL_DEBOUNCE_MS) {
+                setConfigCalibrationCompleted();
+                saveConfigAndNotify();
+                lastSaveTime = millis();
+                calibrationSaved = true;
+                AccInflightCalibrationMeasurementDone = false;
+            }
+        }
+        
+        // Reset sample count and accumulators when inactive
         sampleCount = 0;
         for (int axis = 0; axis < 3; axis++) {
             b[axis] = 0;
         }
     }
-    
-    wasActive = AccInflightCalibrationActive;
 
-    // Save calibration to EEPROM when requested
-    if (AccInflightCalibrationSavetoEEProm) {
-        AccInflightCalibrationSavetoEEProm = false;
-        
-        // Current trims are already applied, just save them
-        setConfigCalibrationCompleted();
-
-        saveConfigAndNotify();
-        beeper(BEEPER_ACC_CALIBRATION); // indicate calibration saved
-    }
+    // Clear the external save request flag (it's no longer used for edge detection)
+    AccInflightCalibrationSavetoEEProm = false;
 }
 
 void setAccelerationTrims(flightDynamicsTrims_t *accelerationTrimsToUse)
