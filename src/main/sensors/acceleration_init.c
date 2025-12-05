@@ -129,9 +129,11 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
 
 PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
-extern bool AccInflightCalibrationMeasurementDone;
-extern bool AccInflightCalibrationSavetoEEProm;
-extern bool AccInflightCalibrationActive;
+// These variables are shared between TASK_MAIN (low priority) and TASK_ACC (high priority)
+// They must be volatile to ensure the high-priority task always reads fresh values
+extern volatile bool AccInflightCalibrationMeasurementDone;
+extern volatile bool AccInflightCalibrationSavetoEEProm;
+extern volatile bool AccInflightCalibrationActive;
 
 #define INFLIGHT_ACC_CAL_WINDOW_MIN 10
 #define INFLIGHT_ACC_CAL_WINDOW_MAX 200
