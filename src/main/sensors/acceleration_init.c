@@ -135,6 +135,7 @@ extern bool AccInflightCalibrationActive;
 
 #define INFLIGHT_ACC_CAL_WINDOW_MIN 10
 #define INFLIGHT_ACC_CAL_WINDOW_MAX 200
+#define INFLIGHT_ACC_CAL_DEBOUNCE_MS 500
 
 static uint8_t getInflightAccCalWindow(void)
 {
@@ -466,9 +467,9 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static bool wasActive = false;
     static uint32_t lastSaveTime = 0;
 
-    // Debounce logic: ignore activation if within 500ms of last save
+    // Debounce logic: ignore activation if within debounce period of last save
     bool effectiveActive = AccInflightCalibrationActive;
-    if (millis() - lastSaveTime < 500) {
+    if (millis() - lastSaveTime < INFLIGHT_ACC_CAL_DEBOUNCE_MS) {
         effectiveActive = false;
     }
 
