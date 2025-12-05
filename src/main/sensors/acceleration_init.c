@@ -29,6 +29,7 @@
 
 #include "build/debug.h"
 
+#include "common/maths.h"
 #include "common/utils.h"
 
 #include "config/config_reset.h"
@@ -118,6 +119,7 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
 {
     RESET_CONFIG_2(accelerometerConfig_t, instance,
         .acc_lpf_hz = 25, // ATTITUDE/IMU runs at 100Hz (acro) or 500Hz (level modes) so we need to set 50 Hz (or lower) to avoid aliasing
+        .acc_inflight_cal_lpf_hz = 5, // Low cutoff for inflight calibration biquad filter
         .acc_hardware = ACC_DEFAULT,
         .acc_high_fsr = false,
     );
@@ -125,7 +127,7 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 2);
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
@@ -354,6 +356,15 @@ void accInitFilters(void)
             pt2FilterInit(&accelerationRuntime.accFilter[axis], k);
         }
     }
+
+    // Initialize biquad filter for inflight acc calibration
+    accelerationRuntime.accInflightCalLpfCutHz = (acc.sampleRateHz) ? accelerometerConfig()->acc_inflight_cal_lpf_hz : 0;
+    if (accelerationRuntime.accInflightCalLpfCutHz) {
+        const uint32_t refreshRate = HZ_TO_INTERVAL_US(acc.sampleRateHz);
+        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+            biquadFilterInitLPF(&accelerationRuntime.accInflightCalFilter[axis], accelerationRuntime.accInflightCalLpfCutHz, refreshRate);
+        }
+    }
 }
 
 bool accInit(uint16_t accSampleRateHz)
@@ -445,6 +456,16 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int32_t b[3];
     static int16_t accZero_saved[3] = { 0, 0, 0 };
     static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
+    static float filteredAcc[3] = { 0, 0, 0 };
+
+    // Always apply biquad filter to acc data to keep filter state updated
+    for (int axis = 0; axis < 3; axis++) {
+        if (accelerationRuntime.accInflightCalLpfCutHz) {
+            filteredAcc[axis] = biquadFilterApply(&accelerationRuntime.accInflightCalFilter[axis], acc.accADC.v[axis]);
+        } else {
+            filteredAcc[axis] = acc.accADC.v[axis];
+        }
+    }
 
     // Saving old zeropoints before measurement
     if (InflightcalibratingA == 50) {
@@ -459,8 +480,8 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
             // Reset a[axis] at start of calibration
             if (InflightcalibratingA == 50)
                 b[axis] = 0;
-            // Sum up 50 readings
-            b[axis] += acc.accADC.v[axis];
+            // Sum up 50 readings using filtered data
+            b[axis] += lrintf(filteredAcc[axis]);
             // Clear global variables for next reading
             acc.accADC.v[axis] = 0;
             accelerationRuntime.accelerationTrims->raw[axis] = 0;
@@ -480,8 +501,9 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
         InflightcalibratingA--;
     }
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
-    if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
+    if (AccInflightCalibrationSavetoEEProm) {      // calibration measurements are complete and ready to save
         AccInflightCalibrationSavetoEEProm = false;
+        AccInflightCalibrationMeasurementDone = false;  // Reset flag to allow subsequent calibrations
         accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
         accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
         accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 50 - acc.dev.acc_1G;    // for nunchuck 200=1G
