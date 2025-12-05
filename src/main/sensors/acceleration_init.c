@@ -496,7 +496,7 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
         InflightcalibratingA--;
     }
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
-    if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed and the combo has been done again
+    if (AccInflightCalibrationSavetoEEProm) {      // calibration measurements are complete and ready to save
         AccInflightCalibrationSavetoEEProm = false;
         accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
         accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
