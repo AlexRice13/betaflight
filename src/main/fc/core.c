@@ -700,9 +700,13 @@ static void updateInflightCalibrationState(void)
         if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone)
             InflightcalibratingA = 50;
         AccInflightCalibrationActive = true;
-    } else if (AccInflightCalibrationMeasurementDone) {
-        AccInflightCalibrationMeasurementDone = false;
-        AccInflightCalibrationSavetoEEProm = true;
+    } else {
+        // BOXCALIB is OFF - reset AccInflightCalibrationActive to allow next calibration
+        AccInflightCalibrationActive = false;
+        if (AccInflightCalibrationMeasurementDone) {
+            AccInflightCalibrationMeasurementDone = false;
+            AccInflightCalibrationSavetoEEProm = true;
+        }
     }
 }
 
