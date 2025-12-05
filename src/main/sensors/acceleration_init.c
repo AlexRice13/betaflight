@@ -522,15 +522,18 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     
     wasActive = effectiveActive;
 
-    // Save calibration to EEPROM when requested
+    // Save calibration to EEPROM when requested (with debounce protection)
     if (AccInflightCalibrationSavetoEEProm) {
         AccInflightCalibrationSavetoEEProm = false;
         
-        // Current trims are already applied, just save them
-        setConfigCalibrationCompleted();
+        // Only save if we're outside the debounce window to prevent rapid re-saves
+        if (millis() - lastSaveTime >= INFLIGHT_ACC_CAL_DEBOUNCE_MS) {
+            // Current trims are already applied, just save them
+            setConfigCalibrationCompleted();
 
-        saveConfigAndNotify();
-        lastSaveTime = millis();
+            saveConfigAndNotify();
+            lastSaveTime = millis();
+        }
     }
 }
 
