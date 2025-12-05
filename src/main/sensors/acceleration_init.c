@@ -128,7 +128,6 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
 
 PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
-extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
 extern bool AccInflightCalibrationSavetoEEProm;
 extern bool AccInflightCalibrationActive;
@@ -463,21 +462,24 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int32_t b[3];
     static uint8_t windowLength = 0;
     static uint16_t sampleCount = 0;
+    static bool wasActive = false;
 
-    // Get the configured window length at start of calibration
-    if (windowLength == 0 || !AccInflightCalibrationActive) {
+    // When calibration becomes active (AUX switch ON), reset accumulators and re-read window length
+    if (AccInflightCalibrationActive && !wasActive) {
         windowLength = getInflightAccCalWindow();
-    }
-
-    // When calibration becomes active, reset accumulators
-    if (AccInflightCalibrationActive && sampleCount == 0) {
-        // Reset accumulators
+        sampleCount = 0;
         for (int axis = 0; axis < 3; axis++) {
             b[axis] = 0;
         }
     }
+    
+    // When calibration becomes inactive (AUX switch OFF), trigger EEPROM save if measurement was done
+    if (!AccInflightCalibrationActive && wasActive && AccInflightCalibrationMeasurementDone) {
+        AccInflightCalibrationSavetoEEProm = true;
+        AccInflightCalibrationMeasurementDone = false;
+    }
 
-    // Continuous calibration: collect samples while BOXCALIB is ON
+    // Collect samples and apply calibration while BOXCALIB AUX is ON
     if (AccInflightCalibrationActive) {
         // Accumulate samples
         for (int axis = 0; axis < 3; axis++) {
@@ -501,14 +503,17 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
             // Mark that we have at least one calibration measurement
             AccInflightCalibrationMeasurementDone = true;
         }
-
-        // Don't clear acc.accADC values - they're needed for flight control
     } else {
-        // Calibration not active, reset sample count
+        // Calibration not active (AUX switch OFF), reset sample count and accumulators
         sampleCount = 0;
+        for (int axis = 0; axis < 3; axis++) {
+            b[axis] = 0;
+        }
     }
+    
+    wasActive = AccInflightCalibrationActive;
 
-    // Save calibration to EEPROM when BOXCALIB is turned OFF
+    // Save calibration to EEPROM when requested
     if (AccInflightCalibrationSavetoEEProm) {
         AccInflightCalibrationSavetoEEProm = false;
         

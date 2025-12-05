@@ -647,56 +647,15 @@ void tryArm(void)
 }
 
 // Automatic ACC Offset Calibration
-bool AccInflightCalibrationArmed = false;
 bool AccInflightCalibrationMeasurementDone = false;
 bool AccInflightCalibrationSavetoEEProm = false;
 bool AccInflightCalibrationActive = false;
-uint16_t InflightcalibratingA = 0;
-
-void handleInflightCalibrationStickPosition(void)
-{
-    if (AccInflightCalibrationMeasurementDone) {
-        // trigger saving into eeprom after landing
-        AccInflightCalibrationMeasurementDone = false;
-        AccInflightCalibrationSavetoEEProm = true;
-    } else {
-        AccInflightCalibrationArmed = !AccInflightCalibrationArmed;
-        if (AccInflightCalibrationArmed) {
-            beeper(BEEPER_ACC_CALIBRATION);
-        } else {
-            beeper(BEEPER_ACC_CALIBRATION_FAIL);
-        }
-    }
-}
 
 static void updateInflightCalibrationState(void)
 {
-    // NOTE: In-flight ACC calibration is triggered exclusively by the BOXCALIB AUX mode.
-    // BOXCALIB ON: Continuously collects samples and applies calibration in real-time.
-    // BOXCALIB OFF: Saves the current calibration to EEPROM.
-    // Multiple calibration cycles can be performed per power-on without disarming.
-    // No disarm guard: calibration can be saved while armed or disarmed.
-    
-    static bool prevCalib = false;
-    bool curCalib = IS_RC_MODE_ACTIVE(BOXCALIB);
-    
-    if (curCalib && !prevCalib) {
-        // Rising edge: BOXCALIB toggled ON, start continuous calibration
-        AccInflightCalibrationActive = true;
-        AccInflightCalibrationMeasurementDone = false;
-    }
-    
-    if (!curCalib && prevCalib) {
-        // Falling edge: BOXCALIB toggled OFF
-        AccInflightCalibrationActive = false;
-        if (AccInflightCalibrationMeasurementDone) {
-            // At least one calibration cycle completed, schedule EEPROM save
-            AccInflightCalibrationSavetoEEProm = true;
-            AccInflightCalibrationMeasurementDone = false;
-        }
-    }
-    
-    prevCalib = curCalib;
+    // Simply set AccInflightCalibrationActive based on AUX switch state
+    // All edge detection and state tracking is done in the faster accelerometer task
+    AccInflightCalibrationActive = IS_RC_MODE_ACTIVE(BOXCALIB);
 }
 
 #if defined(USE_GPS) || defined(USE_MAG)
