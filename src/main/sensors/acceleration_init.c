@@ -60,6 +60,7 @@
 #include "config/config.h"
 
 #include "drivers/bus_spi.h"
+#include "drivers/time.h"
 
 #include "fc/runtime_config.h"
 
@@ -463,9 +464,16 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static uint8_t windowLength = 0;
     static uint16_t sampleCount = 0;
     static bool wasActive = false;
+    static uint32_t lastSaveTime = 0;
+
+    // Debounce logic: ignore activation if within 500ms of last save
+    bool effectiveActive = AccInflightCalibrationActive;
+    if (millis() - lastSaveTime < 500) {
+        effectiveActive = false;
+    }
 
     // When calibration becomes active (AUX switch ON), reset accumulators and re-read window length
-    if (AccInflightCalibrationActive && !wasActive) {
+    if (effectiveActive && !wasActive) {
         windowLength = getInflightAccCalWindow();
         sampleCount = 0;
         for (int axis = 0; axis < 3; axis++) {
@@ -474,13 +482,13 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     }
     
     // When calibration becomes inactive (AUX switch OFF), trigger EEPROM save if measurement was done
-    if (!AccInflightCalibrationActive && wasActive && AccInflightCalibrationMeasurementDone) {
+    if (!effectiveActive && wasActive && AccInflightCalibrationMeasurementDone) {
         AccInflightCalibrationSavetoEEProm = true;
         AccInflightCalibrationMeasurementDone = false;
     }
 
     // Collect samples and apply calibration while BOXCALIB AUX is ON
-    if (AccInflightCalibrationActive) {
+    if (effectiveActive) {
         // Accumulate samples
         for (int axis = 0; axis < 3; axis++) {
             b[axis] += acc.accADC.v[axis];
@@ -511,7 +519,7 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
         }
     }
     
-    wasActive = AccInflightCalibrationActive;
+    wasActive = effectiveActive;
 
     // Save calibration to EEPROM when requested
     if (AccInflightCalibrationSavetoEEProm) {
@@ -521,7 +529,7 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
         setConfigCalibrationCompleted();
 
         saveConfigAndNotify();
-        beeper(BEEPER_ACC_CALIBRATION); // indicate calibration saved
+        lastSaveTime = millis();
     }
 }
 
