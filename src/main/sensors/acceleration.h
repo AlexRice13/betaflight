@@ -83,6 +83,7 @@ typedef union rollAndPitchTrims_u {
 #if defined(USE_ACC)
 typedef struct accelerometerConfig_s {
     uint16_t acc_lpf_hz;                    // cutoff frequency for attitude anti-aliasing filter
+    uint16_t acc_inflight_cal_lpf_hz;       // cutoff frequency for inflight acc calibration biquad filter
     uint8_t acc_hardware;                   // Which acc hardware to use on boards with more than one device
     bool acc_high_fsr;
     flightDynamicsTrims_t accZero;
