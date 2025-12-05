@@ -456,6 +456,16 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int32_t b[3];
     static int16_t accZero_saved[3] = { 0, 0, 0 };
     static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
+    static float filteredAcc[3] = { 0, 0, 0 };
+
+    // Always apply biquad filter to acc data to keep filter state updated
+    for (int axis = 0; axis < 3; axis++) {
+        if (accelerationRuntime.accInflightCalLpfCutHz) {
+            filteredAcc[axis] = biquadFilterApply(&accelerationRuntime.accInflightCalFilter[axis], acc.accADC.v[axis]);
+        } else {
+            filteredAcc[axis] = acc.accADC.v[axis];
+        }
+    }
 
     // Saving old zeropoints before measurement
     if (InflightcalibratingA == 50) {
@@ -470,13 +480,8 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
             // Reset a[axis] at start of calibration
             if (InflightcalibratingA == 50)
                 b[axis] = 0;
-            // Apply biquad filter to acc data for inflight calibration if configured
-            float filteredAcc = acc.accADC.v[axis];
-            if (accelerationRuntime.accInflightCalLpfCutHz) {
-                filteredAcc = biquadFilterApply(&accelerationRuntime.accInflightCalFilter[axis], acc.accADC.v[axis]);
-            }
             // Sum up 50 readings using filtered data
-            b[axis] += lrintf(filteredAcc);
+            b[axis] += lrintf(filteredAcc[axis]);
             // Clear global variables for next reading
             acc.accADC.v[axis] = 0;
             accelerationRuntime.accelerationTrims->raw[axis] = 0;
@@ -498,6 +503,7 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
     if (AccInflightCalibrationSavetoEEProm) {      // calibration measurements are complete and ready to save
         AccInflightCalibrationSavetoEEProm = false;
+        AccInflightCalibrationMeasurementDone = false;  // Reset flag to allow subsequent calibrations
         accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
         accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
         accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 50 - acc.dev.acc_1G;    // for nunchuck 200=1G
