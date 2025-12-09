@@ -468,7 +468,7 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     }
 
     // Saving old zeropoints before measurement
-    if (InflightcalibratingA == 50) {
+    if (InflightcalibratingA == 500) {
         accZero_saved[X] = accelerationRuntime.accelerationTrims->raw[X];
         accZero_saved[Y] = accelerationRuntime.accelerationTrims->raw[Y];
         accZero_saved[Z] = accelerationRuntime.accelerationTrims->raw[Z];
@@ -478,9 +478,9 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     if (InflightcalibratingA > 0) {
         for (int axis = 0; axis < 3; axis++) {
             // Reset a[axis] at start of calibration
-            if (InflightcalibratingA == 50)
+            if (InflightcalibratingA == 500)
                 b[axis] = 0;
-            // Sum up 50 readings using filtered data
+            // Sum up 500 readings using filtered data
             b[axis] += lrintf(filteredAcc[axis]);
             // Clear global variables for next reading
             acc.accADC.v[axis] = 0;
@@ -504,9 +504,9 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     if (AccInflightCalibrationSavetoEEProm) {      // calibration measurements are complete and ready to save
         AccInflightCalibrationSavetoEEProm = false;
         AccInflightCalibrationMeasurementDone = false;  // Reset flag to allow subsequent calibrations
-        accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
-        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
-        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 50 - acc.dev.acc_1G;    // for nunchuck 200=1G
+        accelerationRuntime.accelerationTrims->raw[X] = b[X] / 500;
+        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 500;
+        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 500 - acc.dev.acc_1G;    // for nunchuck 200=1G
 
         resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();

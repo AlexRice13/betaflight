@@ -696,7 +696,7 @@ static void updateInflightCalibrationState(void)
     bool curBoxCalib = IS_RC_MODE_ACTIVE(BOXCALIB);
 
     if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {   // Copter is airborne and you are turning it off via boxarm : start measurement
-        InflightcalibratingA = 50;
+        InflightcalibratingA = 500;
         AccInflightCalibrationArmed = false;
     }
 
@@ -704,7 +704,7 @@ static void updateInflightCalibrationState(void)
     if (curBoxCalib && !prevBoxCalib) {
         // Rising edge: BOXCALIB turned ON - start calibration
         if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone) {
-            InflightcalibratingA = 50;
+            InflightcalibratingA = 500;
         }
         AccInflightCalibrationActive = true;
     } else if (!curBoxCalib && prevBoxCalib) {
