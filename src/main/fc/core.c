@@ -696,14 +696,16 @@ void handleInflightCalibrationStickPosition(void)
 
 static void updateInflightCalibrationState(void)
 {
+    const uint16_t inflightCalSamples = accelerometerConfig()->acc_inflight_cal_samples;
+    
     if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {
-        InflightcalibratingA = 50;
+        InflightcalibratingA = inflightCalSamples;
         AccInflightCalibrationArmed = false;
     }
 
     if (IS_RC_MODE_ACTIVE(BOXCALIB)) {
         if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone) {
-            InflightcalibratingA = 100;
+            InflightcalibratingA = inflightCalSamples;
         }
         AccInflightCalibrationActive = true; // Keep it true as long as switch is held
     } else {

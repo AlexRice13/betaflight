@@ -120,12 +120,14 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
         .acc_lpf_hz = 25, // ATTITUDE/IMU runs at 100Hz (acro) or 500Hz (level modes) so we need to set 50 Hz (or lower) to avoid aliasing
         .acc_hardware = ACC_DEFAULT,
         .acc_high_fsr = false,
+        .acc_inflight_cal_samples = 200,    // Default: 200 samples for inflight calibration
+        .acc_inflight_cal_gyro_limit = 25,  // Default: 25 deg/s max gyro rate for stable sampling
     );
     resetRollAndPitchTrims(&instance->accelerometerTrims);
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 2);
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
@@ -445,46 +447,77 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int32_t b[3];
     static int16_t accZero_saved[3] = { 0, 0, 0 };
     static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
-
+    static uint16_t sampleCount = 0;
+    
+    const uint16_t maxSamples = accelerometerConfig()->acc_inflight_cal_samples;
+    const float gyroRateLimit = accelerometerConfig()->acc_inflight_cal_gyro_limit;
+    
     // Saving old zeropoints before measurement
-    if (InflightcalibratingA == 50) {
+    if (InflightcalibratingA == maxSamples) {
         accZero_saved[X] = accelerationRuntime.accelerationTrims->raw[X];
         accZero_saved[Y] = accelerationRuntime.accelerationTrims->raw[Y];
         accZero_saved[Z] = accelerationRuntime.accelerationTrims->raw[Z];
         angleTrim_saved.values.roll = rollAndPitchTrims->values.roll;
         angleTrim_saved.values.pitch = rollAndPitchTrims->values.pitch;
+        sampleCount = 0;
     }
     if (InflightcalibratingA > 0) {
+        // Check if aircraft is stable (gyro rates below threshold)
+        // gyro.gyroADCf is in deg/s
+        bool isStable = (fabsf(gyro.gyroADCf[X]) < gyroRateLimit) &&
+                        (fabsf(gyro.gyroADCf[Y]) < gyroRateLimit) &&
+                        (fabsf(gyro.gyroADCf[Z]) < gyroRateLimit);
+        
         for (int axis = 0; axis < 3; axis++) {
-            // Reset a[axis] at start of calibration
-            if (InflightcalibratingA == 50)
+            // Reset b[axis] at start of calibration
+            if (InflightcalibratingA == maxSamples) {
                 b[axis] = 0;
-            // Sum up 50 readings
-            b[axis] += acc.accADC.v[axis];
+            }
+            // Only accumulate samples when stable
+            if (isStable) {
+                b[axis] += acc.accADC.v[axis];
+            }
             // Clear global variables for next reading
             acc.accADC.v[axis] = 0;
             accelerationRuntime.accelerationTrims->raw[axis] = 0;
         }
+        
+        // Increment sample count only when stable
+        if (isStable) {
+            sampleCount++;
+        }
+        
         // all values are measured
         if (InflightcalibratingA == 1) {
             AccInflightCalibrationActive = false;
             AccInflightCalibrationMeasurementDone = true;
             beeper(BEEPER_ACC_CALIBRATION); // indicate end of calibration
-            // recover saved values to maintain current flight behaviour until new values are transferred
-            accelerationRuntime.accelerationTrims->raw[X] = accZero_saved[X];
-            accelerationRuntime.accelerationTrims->raw[Y] = accZero_saved[Y];
-            accelerationRuntime.accelerationTrims->raw[Z] = accZero_saved[Z];
-            rollAndPitchTrims->values.roll = angleTrim_saved.values.roll;
-            rollAndPitchTrims->values.pitch = angleTrim_saved.values.pitch;
+            
+            // Apply NEW calibration values immediately to fix race condition
+            if (sampleCount > 0) {
+                accelerationRuntime.accelerationTrims->raw[X] = b[X] / sampleCount;
+                accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / sampleCount;
+                accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / sampleCount - acc.dev.acc_1G;
+                resetRollAndPitchTrims(rollAndPitchTrims);
+            } else {
+                // If no stable samples collected, restore saved values
+                accelerationRuntime.accelerationTrims->raw[X] = accZero_saved[X];
+                accelerationRuntime.accelerationTrims->raw[Y] = accZero_saved[Y];
+                accelerationRuntime.accelerationTrims->raw[Z] = accZero_saved[Z];
+                rollAndPitchTrims->values.roll = angleTrim_saved.values.roll;
+                rollAndPitchTrims->values.pitch = angleTrim_saved.values.pitch;
+            }
         }
         InflightcalibratingA--;
     }
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
     if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
         AccInflightCalibrationSavetoEEProm = false;
-        accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
-        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
-        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 50 - acc.dev.acc_1G;    // for nunchuck 200=1G
+        if (sampleCount > 0) {
+            accelerationRuntime.accelerationTrims->raw[X] = b[X] / sampleCount;
+            accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / sampleCount;
+            accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / sampleCount - acc.dev.acc_1G;
+        }
 
         resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();
