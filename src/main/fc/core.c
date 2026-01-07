@@ -696,17 +696,24 @@ void handleInflightCalibrationStickPosition(void)
 
 static void updateInflightCalibrationState(void)
 {
-    if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {   // Copter is airborne and you are turning it off via boxarm : start measurement
+    if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {
         InflightcalibratingA = 50;
         AccInflightCalibrationArmed = false;
     }
-    if (IS_RC_MODE_ACTIVE(BOXCALIB)) {      // Use the Calib Option to activate : Calib = TRUE measurement started, Land and Calib = 0 measurement stored
-        if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone)
-            InflightcalibratingA = 50;
-        AccInflightCalibrationActive = true;
-    } else if (AccInflightCalibrationMeasurementDone && !ARMING_FLAG(ARMED)) {
-        AccInflightCalibrationMeasurementDone = false;
-        AccInflightCalibrationSavetoEEProm = true;
+
+    if (IS_RC_MODE_ACTIVE(BOXCALIB)) {
+        if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone) {
+            InflightcalibratingA = 100;
+        }
+        AccInflightCalibrationActive = true; // Keep it true as long as switch is held
+    } else {
+        AccInflightCalibrationActive = false; // Reset when switch is released
+        
+        // Save immediately when measurement finishes, even if still armed
+        if (AccInflightCalibrationMeasurementDone) { 
+            AccInflightCalibrationMeasurementDone = false;
+            AccInflightCalibrationSavetoEEProm = true;
+        }
     }
 }
 
