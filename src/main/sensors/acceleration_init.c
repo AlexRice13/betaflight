@@ -448,9 +448,16 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int16_t accZero_saved[3] = { 0, 0, 0 };
     static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
     static uint16_t sampleCount = 0;
+    static uint16_t lastInflightcalibratingA = 0;
     
     const uint16_t maxSamples = accelerometerConfig()->acc_inflight_cal_samples;
     const float gyroRateLimit = accelerometerConfig()->acc_inflight_cal_gyro_limit;
+    
+    // Reset sampleCount if calibration was aborted (InflightcalibratingA reset externally)
+    if (InflightcalibratingA == 0 && lastInflightcalibratingA > 1) {
+        sampleCount = 0;
+    }
+    lastInflightcalibratingA = InflightcalibratingA;
     
     // Saving old zeropoints before measurement
     if (InflightcalibratingA == maxSamples) {
@@ -513,12 +520,7 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
     if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
         AccInflightCalibrationSavetoEEProm = false;
-        if (sampleCount > 0) {
-            accelerationRuntime.accelerationTrims->raw[X] = b[X] / sampleCount;
-            accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / sampleCount;
-            accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / sampleCount - acc.dev.acc_1G;
-        }
-
+        // Values were already applied when measurement completed, just save them to EEPROM
         resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();
 
