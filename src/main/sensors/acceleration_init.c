@@ -125,7 +125,7 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);  // version 3: added acc_calibration_cycles and acc_inflight_calibration_cycles
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);  // v3: add configurable calibration cycles
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
@@ -401,19 +401,16 @@ static bool isOnFinalAccelerationCalibrationCycle(void)
     return accelerationRuntime.calibratingA == 1;
 }
 
-static bool isOnFirstAccelerationCalibrationCycle(void)
-{
-    return accelerationRuntime.calibratingA == accelerometerConfig()->acc_calibration_cycles;
-}
-
 void performAccelerometerCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 {
     static int32_t a[3];
+    const uint16_t cycles = accelerometerConfig()->acc_calibration_cycles;
+    const bool isFirstCycle = (accelerationRuntime.calibratingA == cycles);
 
     for (int axis = 0; axis < 3; axis++) {
 
         // Reset a[axis] at start of calibration
-        if (isOnFirstAccelerationCalibrationCycle()) {
+        if (isFirstCycle) {
             a[axis] = 0;
         }
 
@@ -427,7 +424,6 @@ void performAccelerometerCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 
     if (isOnFinalAccelerationCalibrationCycle()) {
         // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
-        const uint16_t cycles = accelerometerConfig()->acc_calibration_cycles;
         accelerationRuntime.accelerationTrims->raw[X] = (a[X] + (cycles / 2)) / cycles;
         accelerationRuntime.accelerationTrims->raw[Y] = (a[Y] + (cycles / 2)) / cycles;
         accelerationRuntime.accelerationTrims->raw[Z] = (a[Z] + (cycles / 2)) / cycles - acc.dev.acc_1G;
