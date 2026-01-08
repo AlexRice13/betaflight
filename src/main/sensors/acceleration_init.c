@@ -122,12 +122,13 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
         .acc_high_fsr = false,
         .acc_inflight_cal_samples = 200,    // Default: 200 samples for inflight calibration
         .acc_inflight_cal_gyro_limit = 25,  // Default: 25 deg/s max gyro rate for stable sampling
+        .acc_inflight_cal_apply_1g = false, // Default: disabled to prevent z_trim overflow
     );
     resetRollAndPitchTrims(&instance->accelerometerTrims);
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 4);
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
@@ -504,7 +505,12 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
             if (sampleCount > 0) {
                 accelerationRuntime.accelerationTrims->raw[X] = b[X] / sampleCount;
                 accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / sampleCount;
-                accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / sampleCount - acc.dev.acc_1G;
+                // Conditionally apply 1G offset to Z-axis based on configuration to prevent overflow
+                if (accelerometerConfig()->acc_inflight_cal_apply_1g) {
+                    accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / sampleCount - acc.dev.acc_1G;
+                } else {
+                    accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / sampleCount;
+                }
                 resetRollAndPitchTrims(rollAndPitchTrims);
             } else {
                 // If no stable samples collected, restore saved values

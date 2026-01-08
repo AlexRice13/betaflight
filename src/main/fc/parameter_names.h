@@ -34,6 +34,7 @@
 #define PARAM_NAME_ACC_LPF_HZ "acc_lpf_hz"
 #define PARAM_NAME_ACC_INFLIGHT_CAL_SAMPLES "acc_inflight_cal_samples"
 #define PARAM_NAME_ACC_INFLIGHT_CAL_GYRO_LIMIT "acc_inflight_cal_gyro_limit"
+#define PARAM_NAME_ACC_INFLIGHT_CAL_APPLY_1G "acc_inflight_cal_apply_1g"
 #define PARAM_NAME_MAG_HARDWARE "mag_hardware"
 #define PARAM_NAME_BARO_HARDWARE "baro_hardware"
 #define PARAM_NAME_RC_SMOOTHING "rc_smoothing"
