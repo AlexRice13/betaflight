@@ -87,6 +87,8 @@ typedef struct accelerometerConfig_s {
     bool acc_high_fsr;
     flightDynamicsTrims_t accZero;
     rollAndPitchTrims_t accelerometerTrims;
+    uint16_t acc_calibration_cycles;
+    uint16_t acc_inflight_calibration_cycles;
 } accelerometerConfig_t;
 
 PG_DECLARE(accelerometerConfig_t, accelerometerConfig);

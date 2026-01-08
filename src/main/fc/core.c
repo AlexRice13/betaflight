@@ -697,13 +697,13 @@ void handleInflightCalibrationStickPosition(void)
 static void updateInflightCalibrationState(void)
 {
     if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {
-        InflightcalibratingA = 50;
+        InflightcalibratingA = accelerometerConfig()->acc_inflight_calibration_cycles;
         AccInflightCalibrationArmed = false;
     }
 
     if (IS_RC_MODE_ACTIVE(BOXCALIB)) {
         if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone) {
-            InflightcalibratingA = 100;
+            InflightcalibratingA = accelerometerConfig()->acc_inflight_calibration_cycles * 2;
         }
         AccInflightCalibrationActive = true; // Keep it true as long as switch is held
     } else {
