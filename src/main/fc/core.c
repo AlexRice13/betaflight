@@ -699,12 +699,16 @@ static void updateInflightCalibrationState(void)
     const uint16_t inflightCalSamples = accelerometerConfig()->acc_inflight_cal_samples;
     
     if (AccInflightCalibrationArmed && ARMING_FLAG(ARMED) && rcData[THROTTLE] > rxConfig()->mincheck && !IS_RC_MODE_ACTIVE(BOXARM)) {
-        InflightcalibratingA = inflightCalSamples;
+        // Only start calibration if not already in progress
+        if (InflightcalibratingA == 0) {
+            InflightcalibratingA = inflightCalSamples;
+        }
         AccInflightCalibrationArmed = false;
     }
 
     if (IS_RC_MODE_ACTIVE(BOXCALIB)) {
-        if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone) {
+        // Only start calibration if not already in progress or completed
+        if (!AccInflightCalibrationActive && !AccInflightCalibrationMeasurementDone && InflightcalibratingA == 0) {
             InflightcalibratingA = inflightCalSamples;
         }
         AccInflightCalibrationActive = true; // Keep it true as long as switch is held
