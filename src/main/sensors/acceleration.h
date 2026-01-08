@@ -88,7 +88,7 @@ typedef struct accelerometerConfig_s {
     flightDynamicsTrims_t accZero;
     rollAndPitchTrims_t accelerometerTrims;
     uint16_t acc_inflight_cal_samples;      // Number of samples for inflight calibration
-    uint8_t acc_inflight_cal_gyro_limit;    // Maximum gyro rate in deg/s to accept samples
+    uint16_t acc_inflight_cal_gyro_limit;   // Maximum gyro rate in deg/s to accept samples
     bool acc_inflight_cal_apply_1g;         // Apply 1G offset to Z-axis during inflight calibration
 } accelerometerConfig_t;
 
