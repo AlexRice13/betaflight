@@ -75,7 +75,7 @@
 
 #include "acceleration_init.h"
 
-#define CALIBRATING_ACC_CYCLES              400
+#define CALIBRATING_ACC_CYCLES              400  // Default value for accelerometer calibration cycles
 
 FAST_DATA_ZERO_INIT accelerationRuntime_t accelerationRuntime;
 
@@ -120,12 +120,14 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
         .acc_lpf_hz = 25, // ATTITUDE/IMU runs at 100Hz (acro) or 500Hz (level modes) so we need to set 50 Hz (or lower) to avoid aliasing
         .acc_hardware = ACC_DEFAULT,
         .acc_high_fsr = false,
+        .acc_calibration_cycles = 400,
+        .acc_inflight_calibration_cycles = 50,
     );
     resetRollAndPitchTrims(&instance->accelerometerTrims);
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 2);
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
@@ -403,7 +405,7 @@ static bool isOnFinalAccelerationCalibrationCycle(void)
 
 static bool isOnFirstAccelerationCalibrationCycle(void)
 {
-    return accelerationRuntime.calibratingA == CALIBRATING_ACC_CYCLES;
+    return accelerationRuntime.calibratingA == accelerometerConfig()->acc_calibration_cycles;
 }
 
 void performAccelerometerCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
@@ -427,9 +429,10 @@ void performAccelerometerCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
 
     if (isOnFinalAccelerationCalibrationCycle()) {
         // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
-        accelerationRuntime.accelerationTrims->raw[X] = (a[X] + (CALIBRATING_ACC_CYCLES / 2)) / CALIBRATING_ACC_CYCLES;
-        accelerationRuntime.accelerationTrims->raw[Y] = (a[Y] + (CALIBRATING_ACC_CYCLES / 2)) / CALIBRATING_ACC_CYCLES;
-        accelerationRuntime.accelerationTrims->raw[Z] = (a[Z] + (CALIBRATING_ACC_CYCLES / 2)) / CALIBRATING_ACC_CYCLES - acc.dev.acc_1G;
+        const uint16_t cycles = accelerometerConfig()->acc_calibration_cycles;
+        accelerationRuntime.accelerationTrims->raw[X] = (a[X] + (cycles / 2)) / cycles;
+        accelerationRuntime.accelerationTrims->raw[Y] = (a[Y] + (cycles / 2)) / cycles;
+        accelerationRuntime.accelerationTrims->raw[Z] = (a[Z] + (cycles / 2)) / cycles - acc.dev.acc_1G;
 
         resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();
@@ -446,8 +449,10 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     static int16_t accZero_saved[3] = { 0, 0, 0 };
     static rollAndPitchTrims_t angleTrim_saved = { { 0, 0 } };
 
+    const uint16_t inflightCalibrationCycles = accelerometerConfig()->acc_inflight_calibration_cycles;
+
     // Saving old zeropoints before measurement
-    if (InflightcalibratingA == 50) {
+    if (InflightcalibratingA == inflightCalibrationCycles) {
         accZero_saved[X] = accelerationRuntime.accelerationTrims->raw[X];
         accZero_saved[Y] = accelerationRuntime.accelerationTrims->raw[Y];
         accZero_saved[Z] = accelerationRuntime.accelerationTrims->raw[Z];
@@ -457,9 +462,9 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     if (InflightcalibratingA > 0) {
         for (int axis = 0; axis < 3; axis++) {
             // Reset a[axis] at start of calibration
-            if (InflightcalibratingA == 50)
+            if (InflightcalibratingA == inflightCalibrationCycles)
                 b[axis] = 0;
-            // Sum up 50 readings
+            // Sum up readings
             b[axis] += acc.accADC.v[axis];
             // Clear global variables for next reading
             acc.accADC.v[axis] = 0;
@@ -482,9 +487,9 @@ void performInflightAccelerationCalibration(rollAndPitchTrims_t *rollAndPitchTri
     // Calculate average, shift Z down by acc_1G and store values in EEPROM at end of calibration
     if (AccInflightCalibrationSavetoEEProm) {      // the aircraft is landed, disarmed and the combo has been done again
         AccInflightCalibrationSavetoEEProm = false;
-        accelerationRuntime.accelerationTrims->raw[X] = b[X] / 50;
-        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / 50;
-        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / 50 - acc.dev.acc_1G;    // for nunchuck 200=1G
+        accelerationRuntime.accelerationTrims->raw[X] = b[X] / inflightCalibrationCycles;
+        accelerationRuntime.accelerationTrims->raw[Y] = b[Y] / inflightCalibrationCycles;
+        accelerationRuntime.accelerationTrims->raw[Z] = b[Z] / inflightCalibrationCycles - acc.dev.acc_1G;
 
         resetRollAndPitchTrims(rollAndPitchTrims);
         setConfigCalibrationCompleted();
