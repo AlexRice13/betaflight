@@ -75,8 +75,6 @@
 
 #include "acceleration_init.h"
 
-#define CALIBRATING_ACC_CYCLES              400  // Default value for acc_calibration_cycles (for reference only)
-
 FAST_DATA_ZERO_INIT accelerationRuntime_t accelerationRuntime;
 
 void resetRollAndPitchTrims(rollAndPitchTrims_t *rollAndPitchTrims)
@@ -419,7 +417,7 @@ void performAccelerometerCalibration(rollAndPitchTrims_t *rollAndPitchTrims)
             a[axis] = 0;
         }
 
-        // Sum up CALIBRATING_ACC_CYCLES readings
+        // Sum up configured number of readings
         a[axis] += acc.accADC.v[axis];
 
         // Reset global variables to prevent other code from using un-calibrated data
