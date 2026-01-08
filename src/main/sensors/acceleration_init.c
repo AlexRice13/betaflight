@@ -75,7 +75,7 @@
 
 #include "acceleration_init.h"
 
-#define CALIBRATING_ACC_CYCLES              400  // Default value for accelerometer calibration cycles
+#define CALIBRATING_ACC_CYCLES              400  // Default value for acc_calibration_cycles (for reference only)
 
 FAST_DATA_ZERO_INIT accelerationRuntime_t accelerationRuntime;
 
@@ -127,7 +127,7 @@ static void pgResetFn_accelerometerConfig(accelerometerConfig_t *instance)
     resetFlightDynamicsTrims(&instance->accZero);
 }
 
-PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);
+PG_REGISTER_WITH_RESET_FN(accelerometerConfig_t, accelerometerConfig, PG_ACCELEROMETER_CONFIG, 3);  // version 3: added acc_calibration_cycles and acc_inflight_calibration_cycles
 
 extern uint16_t InflightcalibratingA;
 extern bool AccInflightCalibrationMeasurementDone;
@@ -390,7 +390,7 @@ bool accInit(uint16_t accSampleRateHz)
 
 void accStartCalibration(void)
 {
-    accelerationRuntime.calibratingA = CALIBRATING_ACC_CYCLES;
+    accelerationRuntime.calibratingA = accelerometerConfig()->acc_calibration_cycles;
 }
 
 bool accIsCalibrationComplete(void)
