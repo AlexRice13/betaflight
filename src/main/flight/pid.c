@@ -989,7 +989,7 @@ static FAST_CODE_NOINLINE void updateCollisionPidClip(timeUs_t currentTimeUs)
 }
 
 // Apply CPC to a single axis pid_sum
-static FAST_CODE_NOINLINE float applyCollisionPidClip(int axis, float pidSum, float errorRate, timeUs_t currentTimeUs)
+static FAST_CODE_NOINLINE float applyCollisionPidClip(int axis, float pidSum, timeUs_t currentTimeUs)
 {
     // Check if CPC is currently active (within duration window)
     if (pidRuntime.cpcTriggeredAtUs == 0) {
@@ -1608,7 +1608,7 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
 
         // Apply CPC (Collision PID Clip) rate limiting and filtering
         if (pidRuntime.cpcEnabled) {
-            pidSum = applyCollisionPidClip(axis, pidSum, errorRate, currentTimeUs);
+            pidSum = applyCollisionPidClip(axis, pidSum, currentTimeUs);
         }
 
 #ifdef USE_INTEGRATED_YAW_CONTROL
