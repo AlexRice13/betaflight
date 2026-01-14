@@ -1005,15 +1005,17 @@ static FAST_CODE_NOINLINE float applyCollisionPidClip(int axis, float pidSum, fl
     }
 
     // Calculate fadeout factor based on elapsed time (0 at start, 1 at end)
-    const float fadeoutFactor = (float)elapsedUs / pidRuntime.cpcDurationUs;
+    const float fadeoutFactor = (float)elapsedUs / (float)pidRuntime.cpcDurationUs;
 
     // 1. Apply rate limiting to pid_sum change
     float pidSumDelta = pidSum - pidRuntime.cpcPreviousPidSum[axis];
     pidSumDelta = constrainf(pidSumDelta, -pidRuntime.cpcClipRate, pidRuntime.cpcClipRate);
     float clippedPidSum = pidRuntime.cpcPreviousPidSum[axis] + pidSumDelta;
 
-    // 2. Apply PT2 lowpass filter
-    clippedPidSum = pt2FilterApply(&pidRuntime.cpcLowpassFilter[axis], clippedPidSum);
+    // 2. Apply PT2 lowpass filter (if enabled)
+    if (pidRuntime.cpcLowpassEnabled) {
+        clippedPidSum = pt2FilterApply(&pidRuntime.cpcLowpassFilter[axis], clippedPidSum);
+    }
 
     // 3. Blend CPC output with raw output using alpha (with fadeout)
     // At start: full CPC effect (alpha blend), at end: full raw
@@ -1040,7 +1042,7 @@ static FAST_CODE_NOINLINE float applyCollisionPidClipError(float errorRate, time
     }
 
     // Calculate fadeout factor based on elapsed time (0 at start, 1 at end)
-    const float fadeoutFactor = (float)elapsedUs / pidRuntime.cpcDurationUs;
+    const float fadeoutFactor = (float)elapsedUs / (float)pidRuntime.cpcDurationUs;
 
     // Reduce error magnitude by ratio k (with fadeout)
     // At start: full reduction, at end: no reduction

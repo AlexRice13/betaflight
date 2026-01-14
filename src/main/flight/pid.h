@@ -447,10 +447,11 @@ typedef struct pidRuntime_s {
     // Collision PID Clip (CPC) runtime state
     bool cpcEnabled;
     float cpcThreshold;
-    float cpcDurationUs;
+    timeDelta_t cpcDurationUs;
     float cpcClipRate;
     float cpcRatioK;
     float cpcAlpha;
+    bool cpcLowpassEnabled;
     timeUs_t cpcTriggeredAtUs;
     float cpcPreviousPidSum[XYZ_AXIS_COUNT];
     pt2Filter_t cpcLowpassFilter[XYZ_AXIS_COUNT];
