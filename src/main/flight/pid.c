@@ -241,6 +241,13 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .spa_width = { 0, 0, 0 },
         .spa_mode = { 0, 0, 0 },
         .landing_disarm_threshold = 0, // relatively safe values are around 100
+        .cpc = 0,                      // Collision PID Clip disabled by default
+        .cpc_threshold = 0,            // Use landing_disarm_threshold as reference (around 100)
+        .cpc_duration = 500,           // 500ms duration
+        .cpc_lowpass_hz = 60,          // PT2 lowpass filter cutoff at 60Hz
+        .cpc_clip_deg = 300,           // PID sum rate clip at 300 deg/s
+        .cpc_ratio_k = 50,             // 0.5 ratio for error reduction (stored as 0-100)
+        .cpc_alpha = 50,               // 0.5 blend ratio (stored as 0-100)
         .feedforward_yaw_hold_gain = 15,  // zero disables; 15-20 is OK for 5in
         .feedforward_yaw_hold_time = 100,  // a value of 100 is a time constant of about 100ms, and is OK for a 5in; smaller values decay faster, eg for smaller props
         .tpa_curve_type = TPA_CURVE_CLASSIC,
@@ -972,6 +979,78 @@ static FAST_CODE_NOINLINE void disarmOnImpact(void)
     DEBUG_SET(DEBUG_EZLANDING, 7, lrintf(acc.jerkMagnitude * 1e3f));
 }
 
+// Collision PID Clip (CPC) - Detect jerk and apply rate limiting to pid_sum
+static FAST_CODE_NOINLINE void updateCollisionPidClip(timeUs_t currentTimeUs)
+{
+    // Check if jerk exceeds threshold and trigger/reset CPC duration
+    if (acc.jerkMagnitude > pidRuntime.cpcThreshold) {
+        pidRuntime.cpcTriggeredAtUs = currentTimeUs;
+    }
+}
+
+// Apply CPC to a single axis pid_sum
+static FAST_CODE_NOINLINE float applyCollisionPidClip(int axis, float pidSum, float errorRate, timeUs_t currentTimeUs)
+{
+    // Check if CPC is currently active (within duration window)
+    if (pidRuntime.cpcTriggeredAtUs == 0) {
+        pidRuntime.cpcPreviousPidSum[axis] = pidSum;
+        return pidSum;
+    }
+
+    const timeDelta_t elapsedUs = cmpTimeUs(currentTimeUs, pidRuntime.cpcTriggeredAtUs);
+    if (elapsedUs > pidRuntime.cpcDurationUs) {
+        // CPC duration expired
+        pidRuntime.cpcPreviousPidSum[axis] = pidSum;
+        return pidSum;
+    }
+
+    // Calculate fadeout factor based on elapsed time (0 at start, 1 at end)
+    const float fadeoutFactor = (float)elapsedUs / pidRuntime.cpcDurationUs;
+
+    // 1. Apply rate limiting to pid_sum change
+    float pidSumDelta = pidSum - pidRuntime.cpcPreviousPidSum[axis];
+    pidSumDelta = constrainf(pidSumDelta, -pidRuntime.cpcClipRate, pidRuntime.cpcClipRate);
+    float clippedPidSum = pidRuntime.cpcPreviousPidSum[axis] + pidSumDelta;
+
+    // 2. Apply PT2 lowpass filter
+    clippedPidSum = pt2FilterApply(&pidRuntime.cpcLowpassFilter[axis], clippedPidSum);
+
+    // 3. Blend CPC output with raw output using alpha (with fadeout)
+    // At start: full CPC effect (alpha blend), at end: full raw
+    const float effectiveAlpha = pidRuntime.cpcAlpha * (1.0f - fadeoutFactor);
+    float blendedPidSum = (1.0f - effectiveAlpha) * pidSum + effectiveAlpha * clippedPidSum;
+
+    // Store for next iteration
+    pidRuntime.cpcPreviousPidSum[axis] = blendedPidSum;
+
+    return blendedPidSum;
+}
+
+// Apply CPC error reduction to the error rate
+static FAST_CODE_NOINLINE float applyCollisionPidClipError(float errorRate, timeUs_t currentTimeUs)
+{
+    // Check if CPC is currently active (within duration window)
+    if (pidRuntime.cpcTriggeredAtUs == 0) {
+        return errorRate;
+    }
+
+    const timeDelta_t elapsedUs = cmpTimeUs(currentTimeUs, pidRuntime.cpcTriggeredAtUs);
+    if (elapsedUs > pidRuntime.cpcDurationUs) {
+        return errorRate;
+    }
+
+    // Calculate fadeout factor based on elapsed time (0 at start, 1 at end)
+    const float fadeoutFactor = (float)elapsedUs / pidRuntime.cpcDurationUs;
+
+    // Reduce error magnitude by ratio k (with fadeout)
+    // At start: full reduction, at end: no reduction
+    const float effectiveRatioK = pidRuntime.cpcRatioK * (1.0f - fadeoutFactor);
+    const float errorSign = (errorRate >= 0.0f) ? 1.0f : -1.0f;
+    const float reducedError = fabsf(errorRate) * (1.0f - effectiveRatioK);
+
+    return reducedError * errorSign;
+}
+
 #ifdef USE_LAUNCH_CONTROL
 #define LAUNCH_CONTROL_MAX_RATE 100.0f
 #define LAUNCH_CONTROL_MIN_RATE 5.0f
@@ -1207,6 +1286,11 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
         disarmOnImpact();
     }
 
+    // Update CPC (Collision PID Clip) jerk detection
+    if (pidRuntime.cpcEnabled) {
+        updateCollisionPidClip(currentTimeUs);
+    }
+
 #ifdef USE_CHIRP
 
     static int chirpAxis = 0;
@@ -1336,6 +1420,12 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
 #ifdef USE_ABSOLUTE_CONTROL
         const float setpointCorrection = currentPidSetpoint - uncorrectedSetpoint;
 #endif
+
+        // Apply CPC (Collision PID Clip) error reduction
+        if (pidRuntime.cpcEnabled) {
+            errorRate = applyCollisionPidClipError(errorRate, currentTimeUs);
+            itermErrorRate = applyCollisionPidClipError(itermErrorRate, currentTimeUs);
+        }
 
         // --------low-level gyro-based PID based on 2DOF PID controller. ----------
 
@@ -1512,7 +1602,13 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
         applySpa(axis, pidProfile);
 
         // calculating the PID sum
-        const float pidSum = pidData[axis].P + pidData[axis].I + pidData[axis].D + pidData[axis].F + pidData[axis].S;
+        float pidSum = pidData[axis].P + pidData[axis].I + pidData[axis].D + pidData[axis].F + pidData[axis].S;
+
+        // Apply CPC (Collision PID Clip) rate limiting and filtering
+        if (pidRuntime.cpcEnabled) {
+            pidSum = applyCollisionPidClip(axis, pidSum, errorRate, currentTimeUs);
+        }
+
 #ifdef USE_INTEGRATED_YAW_CONTROL
         if (axis == FD_YAW && pidRuntime.useIntegratedYaw) {
             pidData[axis].Sum += pidSum * pidRuntime.dT * 100.0f;

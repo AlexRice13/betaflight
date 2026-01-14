@@ -1420,6 +1420,13 @@ const clivalue_t valueTable[] = {
     { PARAM_NAME_EZ_LANDING_LIMIT,          VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 75 }, PG_PID_PROFILE, offsetof(pidProfile_t, ez_landing_limit) },
     { PARAM_NAME_EZ_LANDING_SPEED,          VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 250 }, PG_PID_PROFILE, offsetof(pidProfile_t, ez_landing_speed) },
     { PARAM_NAME_LANDING_DISARM_THRESHOLD,       VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 250 }, PG_PID_PROFILE, offsetof(pidProfile_t, landing_disarm_threshold) },
+    { PARAM_NAME_CPC,                            VAR_UINT8  | PROFILE_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_PID_PROFILE, offsetof(pidProfile_t, cpc) },
+    { PARAM_NAME_CPC_THRESHOLD,                  VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 250 }, PG_PID_PROFILE, offsetof(pidProfile_t, cpc_threshold) },
+    { PARAM_NAME_CPC_DURATION,                   VAR_UINT16 | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 5000 }, PG_PID_PROFILE, offsetof(pidProfile_t, cpc_duration) },
+    { PARAM_NAME_CPC_LOWPASS_HZ,                 VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 1, 250 }, PG_PID_PROFILE, offsetof(pidProfile_t, cpc_lowpass_hz) },
+    { PARAM_NAME_CPC_CLIP_DEG,                   VAR_UINT16 | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 1000 }, PG_PID_PROFILE, offsetof(pidProfile_t, cpc_clip_deg) },
+    { PARAM_NAME_CPC_RATIO_K,                    VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_PID_PROFILE, offsetof(pidProfile_t, cpc_ratio_k) },
+    { PARAM_NAME_CPC_ALPHA,                      VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_PID_PROFILE, offsetof(pidProfile_t, cpc_alpha) },
 
 #ifdef USE_WING
     { PARAM_NAME_SPA_ROLL_CENTER,    VAR_UINT16  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, UINT16_MAX }, PG_PID_PROFILE, offsetof(pidProfile_t, spa_center[FD_ROLL]) },

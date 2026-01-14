@@ -304,6 +304,14 @@ typedef struct pidProfile_s {
     uint8_t ez_landing_speed;               // Speed below which motor output is limited
     uint8_t landing_disarm_threshold;            // Accelerometer vector delta (jerk) threshold with disarms if exceeded
 
+    uint8_t cpc;                            // Collision PID Clip: enable/disable
+    uint8_t cpc_threshold;                  // Threshold for triggering CPC (jerk magnitude)
+    uint16_t cpc_duration;                  // Duration of CPC effect in ms
+    uint8_t cpc_lowpass_hz;                 // PT2 lowpass filter cutoff frequency in Hz
+    uint16_t cpc_clip_deg;                  // PID sum rate clipping value in deg/s
+    uint8_t cpc_ratio_k;                    // Error reduction ratio (0-100, representing 0.0-1.0)
+    uint8_t cpc_alpha;                      // Blend ratio between raw and CPC output (0-100, representing 0.0-1.0)
+
     uint16_t spa_center[XYZ_AXIS_COUNT];    // RPY setpoint at which PIDs are reduced to 50% (setpoint PID attenuation)
     uint16_t spa_width[XYZ_AXIS_COUNT];     // Width of smooth transition around spa_center
     uint8_t spa_mode[XYZ_AXIS_COUNT];       // SPA mode for each axis
@@ -435,6 +443,17 @@ typedef struct pidRuntime_s {
     bool tpaLowAlways;
     bool useEzDisarm;
     float landingDisarmThreshold;
+
+    // Collision PID Clip (CPC) runtime state
+    bool cpcEnabled;
+    float cpcThreshold;
+    float cpcDurationUs;
+    float cpcClipRate;
+    float cpcRatioK;
+    float cpcAlpha;
+    timeUs_t cpcTriggeredAtUs;
+    float cpcPreviousPidSum[XYZ_AXIS_COUNT];
+    pt2Filter_t cpcLowpassFilter[XYZ_AXIS_COUNT];
 
 #ifdef USE_ITERM_RELAX
     pt1Filter_t windupLpf[XYZ_AXIS_COUNT];
