@@ -238,6 +238,12 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         }
         // Extract data field
         *pDecoded = value & 0x00ff;
+        
+        // Update debug buffer with telemetry type and value when EDT is enabled
+        if (motorIndex < dshotMotorCount && (motorIndex * 2 + 1) < DEBUG16_VALUE_COUNT) {
+            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex * 2, *pType);
+            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex * 2 + 1, *pDecoded);
+        }
     }
 }
 
