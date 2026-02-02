@@ -240,9 +240,9 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         *pDecoded = value & 0x00ff;
         
         // Update debug buffer with telemetry type and value when EDT is enabled
-        if (motorIndex < dshotMotorCount && (motorIndex * 2) < DEBUG16_VALUE_COUNT && (motorIndex * 2 + 1) < DEBUG16_VALUE_COUNT) {
-            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex * 2, *pType);
-            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex * 2 + 1, *pDecoded);
+        // Pack type (upper 8 bits) and value (lower 8 bits) into single debug slot
+        if (motorIndex < dshotMotorCount && motorIndex < DEBUG16_VALUE_COUNT) {
+            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex, (*pType << 8) | *pDecoded);
         }
     }
 }
