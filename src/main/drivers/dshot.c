@@ -152,6 +152,10 @@ FAST_DATA_ZERO_INIT static float dshotRpmAverage;
 FAST_DATA_ZERO_INIT static float dshotRpm[MAX_SUPPORTED_MOTORS];
 FAST_DATA_ZERO_INIT static bool edtAlwaysDecode;
 
+// Debug layout constants for extended telemetry
+// For quad setups: motors 0-3 record type in slots 0-3, value in slots 4-7
+#define DSHOT_TELEMETRY_DEBUG_MOTORS_MAX 4
+
 // Lookup table for extended telemetry type decoding
 // Only contains extended telemetry types, eRPM is handled by conditional logic
 static const dshotTelemetryType_t extendedTelemetryLookup[8] = {
@@ -241,9 +245,9 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         
         // Update debug buffer with telemetry type and value when EDT is enabled
         // For 4-motor setup: motors 0-3 record type in slots 0-3, value in slots 4-7
-        if (motorIndex < dshotMotorCount && motorIndex < 4) {
+        if (motorIndex < dshotMotorCount && motorIndex < DSHOT_TELEMETRY_DEBUG_MOTORS_MAX) {
             DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex, *pType);
-            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex + 4, *pDecoded);
+            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX, *pDecoded);
         }
     }
 }
