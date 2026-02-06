@@ -227,6 +227,10 @@ const char * const lookupTableOffOn[] = {
 static const char * const lookupTableDshotEdt[] = {
     "OFF", "ON", "FORCE"
 };
+
+static const char * const lookupTableDshotTelemetryType[] = {
+    "RPM", "TEMPERATURE", "VOLTAGE", "CURRENT", "DEBUG1", "DEBUG2", "DEBUG3", "STATE_EVENTS"
+};
 #endif
 
 static const char * const lookupTableCrashRecovery[] = {
@@ -652,6 +656,7 @@ const lookupTableEntry_t lookupTables[] = {
     LOOKUP_TABLE_ENTRY(lookupTablePwmProtocol),
 #ifdef USE_DSHOT_TELEMETRY
     LOOKUP_TABLE_ENTRY(lookupTableDshotEdt),
+    LOOKUP_TABLE_ENTRY(lookupTableDshotTelemetryType),
 #endif
     LOOKUP_TABLE_ENTRY(lookupTableLowpassType),
     LOOKUP_TABLE_ENTRY(lookupTableDtermLowpassType),
@@ -967,6 +972,7 @@ const clivalue_t valueTable[] = {
 #ifdef USE_DSHOT_TELEMETRY
     { PARAM_NAME_DSHOT_BIDIR,       VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_MOTOR_CONFIG, offsetof(motorConfig_t, dev.useDshotTelemetry) },
     { "dshot_edt",                  VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_DSHOT_EDT }, PG_MOTOR_CONFIG, offsetof(motorConfig_t, dev.useDshotEdt) },
+    { "dshot_telemetry_debug_type", VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_DSHOT_TELEMETRY_TYPE }, PG_MOTOR_CONFIG, offsetof(motorConfig_t, dev.dshotTelemetryDebugType) },
 #endif
 #ifdef USE_DSHOT_BITBANG
     { "dshot_bitbang",               VAR_UINT8  | HARDWARE_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON_AUTO }, PG_MOTOR_CONFIG, offsetof(motorConfig_t, dev.useDshotBitbang) },

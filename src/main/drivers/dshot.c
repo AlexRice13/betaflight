@@ -233,7 +233,7 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         *pDecoded = dshot_decode_eRPM_telemetry_value(value);
         *pType = DSHOT_TELEMETRY_TYPE_eRPM;
 
-        // Update debug buffer
+        // Update debug buffer - Slots 0-3: Always record RPM for motors 0-3
         if (motorIndex < dshotMotorCount && motorIndex < DEBUG16_VALUE_COUNT) {
             DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex, *pDecoded);
         }
@@ -246,11 +246,12 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         // Extract data field
         *pDecoded = value & 0x00ff;
         
-        // Update debug buffer with telemetry type and value when EDT is enabled
-        // For 4-motor setup: motors 0-3 record type in slots 0-3, value in slots 4-7
+        // Update debug buffer - Slots 4-7: Only record EDT value when type matches filter
+        // For 4-motor setup: motors 0-3 record filtered EDT value in slots 4-7
+        // Non-matching types do not overwrite debug values (keeps curves smooth)
         if (motorIndex < dshotMotorCount && motorIndex < DSHOT_TELEMETRY_DEBUG_MOTORS_MAX &&
-            (motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX) < DEBUG16_VALUE_COUNT) {
-            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex, *pType);
+            (motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX) < DEBUG16_VALUE_COUNT &&
+            *pType == motorConfig()->dev.dshotTelemetryDebugType) {
             DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX, *pDecoded);
         }
     }
