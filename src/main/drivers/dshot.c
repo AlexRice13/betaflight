@@ -38,6 +38,7 @@
 
 #include "common/filter.h"
 #include "common/maths.h"
+#include "common/utils.h"
 
 #include "config/feature.h"
 
@@ -155,6 +156,8 @@ FAST_DATA_ZERO_INIT static bool edtAlwaysDecode;
 // Debug layout constants for extended telemetry
 // For quad setups: motors 0-3 record type in slots 0-3, value in slots 4-7
 #define DSHOT_TELEMETRY_DEBUG_MOTORS_MAX 4
+
+STATIC_ASSERT(DSHOT_TELEMETRY_DEBUG_MOTORS_MAX * 2 <= DEBUG16_VALUE_COUNT, dshot_telemetry_debug_slots_fit);
 
 // Lookup table for extended telemetry type decoding
 // Only contains extended telemetry types, eRPM is handled by conditional logic
