@@ -245,7 +245,8 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         
         // Update debug buffer with telemetry type and value when EDT is enabled
         // For 4-motor setup: motors 0-3 record type in slots 0-3, value in slots 4-7
-        if (motorIndex < dshotMotorCount && motorIndex < DSHOT_TELEMETRY_DEBUG_MOTORS_MAX) {
+        if (motorIndex < dshotMotorCount && motorIndex < DSHOT_TELEMETRY_DEBUG_MOTORS_MAX &&
+            (motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX) < DEBUG16_VALUE_COUNT) {
             DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex, *pType);
             DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX, *pDecoded);
         }
