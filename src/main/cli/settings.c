@@ -39,6 +39,7 @@
 #include "drivers/bus_i2c.h"
 #include "drivers/bus_spi.h"
 #include "drivers/dshot_command.h"
+#include "drivers/dshot.h"
 #include "drivers/camera_control_impl.h"
 #include "drivers/light_led.h"
 #include "drivers/mco.h"
@@ -228,9 +229,11 @@ static const char * const lookupTableDshotEdt[] = {
     "OFF", "ON", "FORCE"
 };
 
+// Telemetry type names must match dshotTelemetryType_t enum order in drivers/dshot.h
 static const char * const lookupTableDshotTelemetryType[] = {
     "RPM", "TEMPERATURE", "VOLTAGE", "CURRENT", "DEBUG1", "DEBUG2", "DEBUG3", "STATE_EVENTS"
 };
+STATIC_ASSERT(ARRAYLEN(lookupTableDshotTelemetryType) == DSHOT_TELEMETRY_TYPE_COUNT, dshot_telemetry_type_lookup_mismatch);
 #endif
 
 static const char * const lookupTableCrashRecovery[] = {

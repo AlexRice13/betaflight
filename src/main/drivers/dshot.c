@@ -235,7 +235,7 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         *pDecoded = dshot_decode_eRPM_telemetry_value(value);
         *pType = DSHOT_TELEMETRY_TYPE_eRPM;
 
-        // Update debug buffer - Slots 0-3: Always record RPM for motors 0-3
+        // Update debug buffer - Slots 0-3: Always record RPM (from eRPM telemetry)
         if (motorIndex < dshotMotorCount && motorIndex < DEBUG16_VALUE_COUNT) {
             DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex, *pDecoded);
         }
