@@ -249,7 +249,7 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         *pDecoded = value & 0x00ff;
         
         // Update debug buffer - Slots 4-7: Only record EDT value when type matches filter
-        // For 4-motor setup: motors 0-3 record filtered EDT value in slots 4-7
+        // For 4-motor setup: filtered EDT values in slots 4-7 (motor 0→slot 4, motor 1→slot 5, etc.)
         // Non-matching types do not overwrite debug values (keeps curves smooth)
         if (motorIndex < dshotMotorCount && motorIndex < DSHOT_TELEMETRY_DEBUG_MOTORS_MAX &&
             (motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX) < DEBUG16_VALUE_COUNT &&

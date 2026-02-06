@@ -231,7 +231,7 @@ static const char * const lookupTableDshotEdt[] = {
 
 // Telemetry type names must match dshotTelemetryType_t enum order in drivers/dshot.h
 static const char * const lookupTableDshotTelemetryType[] = {
-    "RPM", "TEMPERATURE", "VOLTAGE", "CURRENT", "DEBUG1", "DEBUG2", "DEBUG3", "STATE_EVENTS"
+    "eRPM", "TEMPERATURE", "VOLTAGE", "CURRENT", "DEBUG1", "DEBUG2", "DEBUG3", "STATE_EVENTS"
 };
 STATIC_ASSERT(ARRAYLEN(lookupTableDshotTelemetryType) == DSHOT_TELEMETRY_TYPE_COUNT, dshot_telemetry_type_lookup_mismatch);
 #endif
