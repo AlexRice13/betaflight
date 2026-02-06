@@ -26,6 +26,7 @@
 #ifdef USE_MOTOR
 
 #include "drivers/motor_types.h"
+#include "drivers/dshot.h"
 
 #include "pg/pg.h"
 #include "pg/pg_ids.h"
@@ -117,6 +118,7 @@ void pgResetFn_motorConfig(motorConfig_t *motorConfig)
 #ifdef USE_DSHOT_TELEMETRY
     motorConfig->dev.useDshotTelemetry = DEFAULT_DSHOT_TELEMETRY;
     motorConfig->dev.useDshotEdt = DEFAULT_DSHOT_EDT;
+    motorConfig->dev.dshotTelemetryDebugType = DSHOT_TELEMETRY_TYPE_TEMPERATURE; // Default to temperature
 #endif
 
 #ifdef USE_DSHOT_BITBANG

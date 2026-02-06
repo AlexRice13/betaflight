@@ -38,6 +38,7 @@
 
 #include "common/filter.h"
 #include "common/maths.h"
+#include "common/utils.h"
 
 #include "config/feature.h"
 
@@ -151,6 +152,13 @@ FAST_DATA_ZERO_INIT static float erpmToHz;
 FAST_DATA_ZERO_INIT static float dshotRpmAverage;
 FAST_DATA_ZERO_INIT static float dshotRpm[MAX_SUPPORTED_MOTORS];
 FAST_DATA_ZERO_INIT static bool edtAlwaysDecode;
+FAST_DATA_ZERO_INIT static dshotTelemetryType_t dshotTelemetryDebugTypeFilter;
+
+// Debug layout constants for extended telemetry
+// For quad setups: motors 0-3 record type in slots 0-3, value in slots 4-7
+#define DSHOT_TELEMETRY_DEBUG_MOTORS_MAX 4
+
+STATIC_ASSERT(DSHOT_TELEMETRY_DEBUG_MOTORS_MAX * 2 <= DEBUG16_VALUE_COUNT, dshot_telemetry_debug_slots_fit);
 
 // Lookup table for extended telemetry type decoding
 // Only contains extended telemetry types, eRPM is handled by conditional logic
@@ -182,6 +190,7 @@ void initDshotTelemetry(const timeUs_t looptimeUs)
     // erpmToHz is used by bidir dshot and ESC telemetry
     erpmToHz = ERPM_PER_LSB / SECONDS_PER_MINUTE / (motorConfig()->motorPoleCount / 2.0f);
     edtAlwaysDecode = motorConfig()->dev.useDshotEdt == DSHOT_EDT_FORCE;
+    dshotTelemetryDebugTypeFilter = (dshotTelemetryType_t)motorConfig()->dev.dshotTelemetryDebugType;
 
 #ifdef USE_RPM_FILTER
     if (motorConfig()->dev.useDshotTelemetry) {
@@ -226,7 +235,7 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         *pDecoded = dshot_decode_eRPM_telemetry_value(value);
         *pType = DSHOT_TELEMETRY_TYPE_eRPM;
 
-        // Update debug buffer
+        // Update debug buffer - Slots 0-3: Always record RPM (from eRPM telemetry)
         if (motorIndex < dshotMotorCount && motorIndex < DEBUG16_VALUE_COUNT) {
             DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex, *pDecoded);
         }
@@ -238,6 +247,15 @@ static void dshot_decode_telemetry_value(uint8_t motorIndex, uint32_t *pDecoded,
         }
         // Extract data field
         *pDecoded = value & 0x00ff;
+        
+        // Update debug buffer - Slots 4-7: Only record EDT value when type matches filter
+        // For 4-motor setup: filtered EDT values in slots 4-7 (motor 0→slot 4, motor 1→slot 5, etc.)
+        // Non-matching types do not overwrite debug values (keeps curves smooth)
+        if (motorIndex < dshotMotorCount && motorIndex < DSHOT_TELEMETRY_DEBUG_MOTORS_MAX &&
+            (motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX) < DEBUG16_VALUE_COUNT &&
+            *pType == dshotTelemetryDebugTypeFilter) {
+            DEBUG_SET(DEBUG_DSHOT_RPM_TELEMETRY, motorIndex + DSHOT_TELEMETRY_DEBUG_MOTORS_MAX, *pDecoded);
+        }
     }
 }
 

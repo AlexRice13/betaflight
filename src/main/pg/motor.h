@@ -71,6 +71,7 @@ typedef struct motorDevConfig_s {
     uint8_t  useBurstDshot;
     uint8_t  useDshotTelemetry;
     uint8_t  useDshotEdt;
+    uint8_t  dshotTelemetryDebugType;    // EDT telemetry type to display in debug slots 4-7 (dshotTelemetryType_t)
     ioTag_t  ioTags[MAX_SUPPORTED_MOTORS];
     uint8_t  motorTransportProtocol;
     uint8_t  useDshotBitbang;
