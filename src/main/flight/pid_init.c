@@ -326,6 +326,14 @@ void pidInitFilters(const pidProfile_t *pidProfile)
 #endif
 
     pt2FilterInit(&pidRuntime.antiGravityLpf, pt2FilterGain(pidProfile->anti_gravity_cutoff_hz, pidRuntime.dT));
+
+    // Initialize CPC (Collision PID Clip) filters
+    if (pidProfile->cpc > 0 && pidProfile->cpc_lowpass_hz > 0) {
+        for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+            pt2FilterInit(&pidRuntime.cpcLowpassFilter[axis], pt2FilterGain(pidProfile->cpc_lowpass_hz, pidRuntime.dT));
+        }
+    }
+
 #ifdef USE_WING
     for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
         pidRuntime.spa[axis] = 1.0f; // 1.0 = no PID attenuation in runtime. 0 - full attenuation (no PIDs)
@@ -580,6 +588,19 @@ void pidInitConfig(const pidProfile_t *pidProfile)
 
     pidRuntime.useEzDisarm = pidProfile->landing_disarm_threshold > 0;
     pidRuntime.landingDisarmThreshold = pidProfile->landing_disarm_threshold * 10.0f;
+
+    // Collision PID Clip (CPC) initialization
+    pidRuntime.cpcEnabled = pidProfile->cpc > 0;
+    pidRuntime.cpcThreshold = pidProfile->cpc_threshold * 10.0f;  // Scale by 10.0f (same scaling as landingDisarmThreshold)
+    pidRuntime.cpcDurationUs = pidProfile->cpc_duration * 1000;   // Convert ms to us
+    pidRuntime.cpcClipRate = pidProfile->cpc_clip_deg * pidRuntime.dT;  // Rate limit per dT
+    pidRuntime.cpcRatioK = pidProfile->cpc_ratio_k / 100.0f;      // Convert 0-100 to 0.0-1.0
+    pidRuntime.cpcAlpha = pidProfile->cpc_alpha / 100.0f;         // Convert 0-100 to 0.0-1.0
+    pidRuntime.cpcLowpassEnabled = pidProfile->cpc_lowpass_hz > 0;
+    pidRuntime.cpcTriggeredAtUs = 0;
+    for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
+        pidRuntime.cpcPreviousPidSum[axis] = 0.0f;
+    }
 
 #ifdef USE_WING
     tpaSpeedInit(pidProfile);
