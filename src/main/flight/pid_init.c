@@ -310,9 +310,16 @@ void pidInitFilters(const pidProfile_t *pidProfile)
         pt1FilterInit(&pidRuntime.horizonSmoothingPt1, kHorizon);
     }
 
+    // Angle D-term derivative filter: 10 Hz cutoff smooths the sparse attitude updates (500Hz)
+    // running at PID rate into a continuous derivative estimate without introducing excessive noise
+    const float angleDCutoffHz = 10.0f;
+    const float kd = pt2FilterGain(angleDCutoffHz, pidRuntime.dT);
+
     for (int axis = 0; axis < 2; axis++) {  // ROLL and PITCH only
         pt3FilterInit(&pidRuntime.attitudeFilter[axis], k);
         pt3FilterInit(&pidRuntime.angleFeedforwardPt3[axis], k2);
+        pt2FilterInit(&pidRuntime.angleDFilter[axis], kd);
+        pidRuntime.anglePreviousErrorAngle[axis] = 0.0f;
     }
     pidRuntime.angleYawSetpoint = 0.0f;
 #endif
@@ -407,6 +414,8 @@ void pidInitConfig(const pidProfile_t *pidProfile)
     pidRuntime.angleFeedforwardGain = pidProfile->pid[PID_LEVEL].F / 100.0f;
 #ifdef USE_ACC
     pidRuntime.angleEarthRef = pidProfile->angle_earth_ref / 100.0f;
+    // angleDGain: scale so that strength=10 gives gain=1.0; zero disables D-term for backward compatibility
+    pidRuntime.angleDGain = pidProfile->angle_d_strength / 10.0f;
 #endif
     pidRuntime.horizonGain = MIN(pidProfile->pid[PID_LEVEL].I / 100.0f, 1.0f);
     pidRuntime.horizonIgnoreSticks = (pidProfile->horizon_ignore_sticks) ? 1.0f : 0.0f;

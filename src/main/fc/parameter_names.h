@@ -179,6 +179,7 @@
 #define PARAM_NAME_ANGLE_FEEDFORWARD "angle_feedforward"
 #define PARAM_NAME_ANGLE_FF_SMOOTHING_MS "angle_feedforward_smoothing_ms"
 #define PARAM_NAME_ANGLE_LIMIT "angle_limit"
+#define PARAM_NAME_ANGLE_D_STRENGTH "angle_d_strength"
 #define PARAM_NAME_S_PITCH "s_pitch"
 #define PARAM_NAME_S_ROLL "s_roll"
 #define PARAM_NAME_S_YAW "s_yaw"

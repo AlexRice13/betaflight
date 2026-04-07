@@ -230,6 +230,7 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .tpa_breakpoint = 1350,
         .angle_feedforward_smoothing_ms = 80,
         .angle_earth_ref = 100,
+        .angle_d_strength = 0,  // D-term disabled by default for backward compatibility
         .horizon_delay_ms = 500, // 500ms time constant on any increase in horizon strength
         .tpa_low_rate = 20,
         .tpa_low_breakpoint = 1050,
@@ -594,7 +595,31 @@ STATIC_UNIT_TESTED FAST_CODE_NOINLINE float pidLevel(int axis, const pidProfile_
 
     const float currentAngle = (attitude.raw[axis] - angleTrim->raw[axis]) / 10.0f; // stepped at 500hz with some 4ms flat spots
     const float errorAngle = angleTarget - currentAngle;
-    float angleRate = errorAngle * pidRuntime.angleGain + angleFeedforward;
+
+    // D-term for the angle-mode loop: damps the approach to the target angle, reducing overshoot
+    // and preventing flip-overs caused by large feedforward spikes or sudden attitude errors.
+    //
+    // Design choice: differentiate errorAngle (= angleTarget - currentAngle) rather than
+    // currentAngle alone.  This gives full PD behaviour:
+    //   • When errorAngle is large and decreasing (approaching target) the D-term is negative
+    //     and reduces the P-term command, preventing overshoot.
+    //   • When errorAngle is increasing (drifting away) the D-term is positive and supplements
+    //     the P-term for faster recovery.
+    //
+    // Noise handling: attitude.raw is updated at ~500 Hz, so errorAngle is a staircase at PID
+    // rate (typically 4 kHz).  The derivative would be a train of spikes (all-zeros except one
+    // large pulse per attitude update).  The angleDFilter (PT2 at 10 Hz) smooths this into a
+    // continuous estimate of de/dt without introducing significant phase lag for the slow angle
+    // dynamics.  Multiplying by pidFrequency converts the per-sample delta to deg/s.
+    float angleDTerm = 0.0f;
+    if (pidRuntime.angleDGain > 0.0f) {
+        const float deltaErrorAngle = errorAngle - pidRuntime.anglePreviousErrorAngle[axis];
+        const float filteredDelta = pt2FilterApply(&pidRuntime.angleDFilter[axis], deltaErrorAngle);
+        angleDTerm = filteredDelta * pidRuntime.pidFrequency * pidRuntime.angleDGain;
+    }
+    pidRuntime.anglePreviousErrorAngle[axis] = errorAngle;
+
+    float angleRate = errorAngle * pidRuntime.angleGain + angleDTerm + angleFeedforward;
 
     // minimise cross-axis wobble due to faster yaw responses than roll or pitch, and make co-ordinated yaw turns
     // by compensating for the effect of yaw on roll while pitched, and on pitch while rolled
@@ -609,6 +634,12 @@ STATIC_UNIT_TESTED FAST_CODE_NOINLINE float pidLevel(int axis, const pidProfile_
     // this filter runs at ATTITUDE_CUTOFF_HZ, currently 50hz, so GPS roll may be a bit steppy
     angleRate = pt3FilterApply(&pidRuntime.attitudeFilter[axis], angleRate);
 
+    // Clamp the angle-mode output to the maximum configured rate so that saturation from
+    // feedforward spikes or large D-term contributions cannot produce outputs that exceed
+    // the craft's normal rate envelope and risk a flip-over.
+    const float rateLimitForAxis = 1.0f / maxSetpointRateInv; // == getMaxRcRate(axis)
+    angleRate = constrainf(angleRate, -rateLimitForAxis, rateLimitForAxis);
+
     if (FLIGHT_MODE(ANGLE_MODE| GPS_RESCUE_MODE | POS_HOLD_MODE)) {
         currentPidSetpoint = angleRate;
     } else {
@@ -619,14 +650,14 @@ STATIC_UNIT_TESTED FAST_CODE_NOINLINE float pidLevel(int axis, const pidProfile_
     //logging
     if (axis == FD_ROLL) {
         DEBUG_SET(DEBUG_ANGLE_MODE, 0, lrintf(angleTarget * 10.0f)); // target angle
-        DEBUG_SET(DEBUG_ANGLE_MODE, 1, lrintf(errorAngle * pidRuntime.angleGain * 10.0f)); // un-smoothed error correction in degrees
+        DEBUG_SET(DEBUG_ANGLE_MODE, 1, lrintf((errorAngle * pidRuntime.angleGain + angleDTerm) * 10.0f)); // combined P+D correction (deg/s * 10)
         DEBUG_SET(DEBUG_ANGLE_MODE, 2, lrintf(angleFeedforward * 10.0f)); // feedforward amount in degrees
         DEBUG_SET(DEBUG_ANGLE_MODE, 3, lrintf(currentAngle * 10.0f)); // angle returned
 
         DEBUG_SET(DEBUG_ANGLE_TARGET, 0, lrintf(angleTarget * 10.0f));
         DEBUG_SET(DEBUG_ANGLE_TARGET, 1, lrintf(sinAngle * 10.0f)); // modification factor from earthRef
-        // debug ANGLE_TARGET 2 is yaw attenuation
-        DEBUG_SET(DEBUG_ANGLE_TARGET, 3, lrintf(currentAngle * 10.0f)); // angle returned
+        DEBUG_SET(DEBUG_ANGLE_TARGET, 2, lrintf(angleDTerm * 10.0f)); // D-term contribution (deg/s * 10)
+        DEBUG_SET(DEBUG_ANGLE_TARGET, 3, lrintf(currentPidSetpoint * 10.0f)); // clamped output (deg/s * 10)
     }
 
     DEBUG_SET(DEBUG_CURRENT_ANGLE, axis, lrintf(currentAngle * 10.0f)); // current angle
