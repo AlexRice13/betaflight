@@ -310,7 +310,7 @@ void pidInitFilters(const pidProfile_t *pidProfile)
         pt1FilterInit(&pidRuntime.horizonSmoothingPt1, kHorizon);
     }
 
-    // Angle D-term derivative filter: 10 Hz cutoff smooths the sparse attitude updates (500Hz)
+    // Angle D-term derivative filter: 10 Hz cutoff smooths the sparse attitude updates (500 Hz)
     // running at PID rate into a continuous derivative estimate without introducing excessive noise
     const float angleDCutoffHz = 10.0f;
     const float kd = pt2FilterGain(angleDCutoffHz, pidRuntime.dT);

@@ -450,7 +450,7 @@ TEST(pidControllerTest, testPidLevel)
     EXPECT_FLOAT_EQ(-231.55479, calculatedAngleSetpoint);
 }
 
-TEST(pidControllerTest, testPidLevelDTermBackwardsCompat)
+TEST(pidControllerTest, testPidLevelDTermBackwardsCompatibility)
 {
     // Verify that angle_d_strength = 0 (default) produces identical output to the
     // pre-D-term behaviour, i.e. the new code path is a true no-op when disabled.
@@ -474,7 +474,7 @@ TEST(pidControllerTest, testPidLevelDTermDamping)
 {
     // Verify that a non-zero angle_d_strength activates the D-term and that:
     //   1. With constant errorAngle the D contribution decays toward zero.
-    //   2. When errorAngle changes the output differs from the pure-P output.
+    //   2. When errorAngle changes suddenly the D term is non-zero (output differs).
     //   3. Re-setting D gain to 0 restores the undamped response.
     resetTest();
     ENABLE_ARMING_FLAG(ARMED);
@@ -501,14 +501,18 @@ TEST(pidControllerTest, testPidLevelDTermDamping)
     //   steadyState = 17.91 * 5.0 = ~89.55 deg/s
     // With D-term settled to zero the result must be close to this steady-state value.
     EXPECT_NEAR(89.552f, prevResult, 1.0f); // within 1 deg/s after settling
+    const float settledResult = prevResult;
 
     // ---- Case 2: sudden change in errorAngle => D term non-zero ----
-    // Move attitude so that errorAngle changes suddenly on the next call
-    attitude.values.roll = -100; // 10 degrees roll tilt
+    // Move attitude so that errorAngle increases suddenly on the next call.
+    // With D-term active the immediate response must be greater than the settled
+    // steady-state value (positive D contribution for increasing errorAngle).
+    attitude.values.roll = -300; // 30 degrees roll tilt -> errorAngle grows
     float resultWithChange = pidLevel(FD_ROLL, pidProfile, &angleTrim, setpointRoll, calcHorizonLevelStrength());
-    // The errorAngle has increased; the D term adds to the P term so output must be >= pure P
-    // (both PT3 attitudeFilter and D filter mean the change is gradual but non-zero).
-    (void)resultWithChange; // result is filter-state dependent; just ensure it compiles and runs
+    // The D-term fires positively because errorAngle increased; the (unfiltered) D
+    // contribution propagates through the PT3 attitudeFilter so the immediate change
+    // is small but the output must differ from the settled value.
+    EXPECT_NE(settledResult, resultWithChange); // D-term made the output change
 
     // ---- Case 3: disable D gain => back to pure-P ----
     pidProfile->angle_d_strength = 0;
