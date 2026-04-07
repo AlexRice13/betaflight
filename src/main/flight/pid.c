@@ -231,6 +231,8 @@ void resetPidProfile(pidProfile_t *pidProfile)
         .angle_feedforward_smoothing_ms = 80,
         .angle_earth_ref = 100,
         .angle_d_strength = 0,  // D-term disabled by default for backward compatibility
+        .angle_d_lowpass_hz = 10, // 10 Hz lowpass for angle D-term derivative filter
+        .angle_rate_limit = 0,   // 0 = use maxRcRate as rate limit
         .horizon_delay_ms = 500, // 500ms time constant on any increase in horizon strength
         .tpa_low_rate = 20,
         .tpa_low_breakpoint = 1050,
@@ -634,10 +636,10 @@ STATIC_UNIT_TESTED FAST_CODE_NOINLINE float pidLevel(int axis, const pidProfile_
     // this filter runs at ATTITUDE_CUTOFF_HZ, currently 50hz, so GPS roll may be a bit steppy
     angleRate = pt3FilterApply(&pidRuntime.attitudeFilter[axis], angleRate);
 
-    // Clamp the angle-mode output to the maximum configured rate so that saturation from
-    // feedforward spikes or large D-term contributions cannot produce outputs that exceed
-    // the craft's normal rate envelope and risk a flip-over.
-    const float rateLimitForAxis = 1.0f / maxSetpointRateInv; // == getMaxRcRate(axis)
+    // Clamp the angle-mode output to prevent saturated outputs that can flip the quad.
+    // When angle_rate_limit is non-zero use the explicit user-configured limit;
+    // otherwise fall back to getMaxRcRate(axis) for backward-compatible behaviour.
+    const float rateLimitForAxis = (pidRuntime.angleRateLimit > 0.0f) ? pidRuntime.angleRateLimit : (1.0f / maxSetpointRateInv);
     angleRate = constrainf(angleRate, -rateLimitForAxis, rateLimitForAxis);
 
     if (FLIGHT_MODE(ANGLE_MODE| GPS_RESCUE_MODE | POS_HOLD_MODE)) {

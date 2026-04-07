@@ -295,6 +295,8 @@ typedef struct pidProfile_s {
     uint8_t angle_feedforward_smoothing_ms; // Smoothing factor for angle feedforward as time constant in milliseconds
     uint8_t angle_earth_ref;                // Control amount of "co-ordination" from yaw into roll while pitched forward in angle mode
     uint8_t angle_d_strength;              // D-term strength for angle-mode loop (0 = disabled, backward-compatible default)
+    uint8_t angle_d_lowpass_hz;            // Lowpass cutoff frequency for angle D-term derivative filter (Hz)
+    uint16_t angle_rate_limit;             // Rate limit for angle-mode output (deg/s); 0 = use maxRcRate
     uint16_t horizon_delay_ms;              // delay when Horizon Strength increases, 50 = 500ms time constant
     int8_t tpa_low_rate;                    // Percent reduction in P or D at zero throttle
     uint16_t tpa_low_breakpoint;            // Breakpoint where lower TPA is deactivated
@@ -529,6 +531,7 @@ typedef struct pidRuntime_s {
     float angleDGain;                           // D-term gain for angle-mode loop
     float anglePreviousErrorAngle[RP_AXIS_COUNT]; // Previous errorAngle for derivative computation
     pt2Filter_t angleDFilter[RP_AXIS_COUNT];    // Smoothing filter for angle D-term derivative
+    float angleRateLimit;                       // Rate limit for angle-mode output (deg/s); 0 = use maxRcRate
 #endif
 
 #ifdef USE_WING

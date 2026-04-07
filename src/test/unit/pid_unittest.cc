@@ -563,6 +563,42 @@ TEST(pidControllerTest, testPidLevelOutputClamp)
     }
 }
 
+TEST(pidControllerTest, testPidLevelConfigurableRateLimit)
+{
+    // Verify that a non-zero angle_rate_limit overrides the maxRcRate-based clamp.
+    resetTest();
+    ENABLE_ARMING_FLAG(ARMED);
+    pidStabilisationState(PID_STABILISATION_ON);
+    enableFlightMode(ANGLE_MODE);
+
+    rollAndPitchTrims_t angleTrim = { { 0, 0 } };
+
+    // Set an explicit rate limit smaller than the default maxRcRate (670).
+    pidProfile->angle_rate_limit = 150; // 150 deg/s explicit limit
+    pidInit(pidProfile);
+
+    // Large attitude error to saturate the output.
+    attitude.values.roll = -600; // -60 degrees
+    float sp = 0.0f;
+    for (int i = 0; i < 200; i++) {
+        sp = pidLevel(FD_ROLL, pidProfile, &angleTrim, 400, calcHorizonLevelStrength());
+    }
+    // Output must be clamped at the configured 150 deg/s
+    EXPECT_LE(sp, 150.0f + 1.0f);
+    EXPECT_GT(sp, 0.0f);
+
+    // Set angle_rate_limit = 0 to fallback to maxRcRate (670 deg/s).
+    pidProfile->angle_rate_limit = 0;
+    pidInit(pidProfile);
+
+    attitude.values.roll = -600;
+    for (int i = 0; i < 200; i++) {
+        sp = pidLevel(FD_ROLL, pidProfile, &angleTrim, 400, calcHorizonLevelStrength());
+    }
+    // With no explicit limit, the clamp is maxRcRate = 670; the P output of ~600 should pass through
+    EXPECT_GT(sp, 150.0f); // must be greater than the old explicit limit
+}
+
 
 TEST(pidControllerTest, testPidHorizon)
 {
