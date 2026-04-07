@@ -1295,6 +1295,9 @@ const clivalue_t valueTable[] = {
     { PARAM_NAME_ANGLE_FF_SMOOTHING_MS, VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 10, 250 }, PG_PID_PROFILE, offsetof(pidProfile_t, angle_feedforward_smoothing_ms) },
     { PARAM_NAME_ANGLE_LIMIT,           VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 10, 80 }, PG_PID_PROFILE, offsetof(pidProfile_t, angle_limit) },
     { PARAM_NAME_ANGLE_EARTH_REF,       VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_PID_PROFILE, offsetof(pidProfile_t, angle_earth_ref) },
+    { PARAM_NAME_ANGLE_D_STRENGTH,      VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 200 }, PG_PID_PROFILE, offsetof(pidProfile_t, angle_d_strength) },
+    { PARAM_NAME_ANGLE_D_LOWPASS_HZ,    VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 1, 50 },  PG_PID_PROFILE, offsetof(pidProfile_t, angle_d_lowpass_hz) },
+    { PARAM_NAME_ANGLE_RATE_LIMIT,      VAR_UINT16 | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 1998 }, PG_PID_PROFILE, offsetof(pidProfile_t, angle_rate_limit) },
 
     { PARAM_NAME_HORIZON_LEVEL_STRENGTH, VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 0, 100 }, PG_PID_PROFILE, offsetof(pidProfile_t, pid[PID_LEVEL].I) },
     { PARAM_NAME_HORIZON_LIMIT_STICKS,   VAR_UINT8  | PROFILE_VALUE, .config.minmaxUnsigned = { 10, 200 }, PG_PID_PROFILE, offsetof(pidProfile_t, pid[PID_LEVEL].D) },
