@@ -177,6 +177,7 @@ COMMON_SRC = \
             flight/mixer_tricopter.c \
             flight/pid.c \
             flight/pid_init.c \
+            flight/step_response.c \
             flight/position.c \
             flight/position_estimator.c \
             flight/position_filter.c \
@@ -561,6 +562,7 @@ ifneq ($(DSP_LIB),)
 
 INCLUDE_DIRS += $(DSP_LIB)/Include
 SRC += $(wildcard $(DSP_LIB)/Source/*/*.S)
+SRC += $(STEP_RESPONSE_DSP_SRC)
 
 endif
 

@@ -159,6 +159,7 @@
 #include "flight/imu.h"
 #include "flight/mixer.h"
 #include "flight/pid.h"
+#include "flight/step_response.h"
 
 #include "io/gps.h"
 #include "io/vtx.h"
@@ -1018,12 +1019,14 @@ static void osdElementCurrentDraw(osdElementParms_t *element)
 
 static void osdElementDebug(osdElementParms_t *element)
 {
-    tfp_sprintf(element->buff, "DBG %5d %5d %5d %5d", debug[0], debug[1], debug[2], debug[3]);
+    const char *label = stepResponseGetDebugLabel(0);
+    tfp_sprintf(element->buff, "%c%c%c %5d %5d %5d %5d", label[0], label[1] ? label[1] : ' ', label[2] ? label[2] : ' ', debug[0], debug[1], debug[2], debug[3]);
 }
 
 static void osdElementDebug2(osdElementParms_t *element)
 {
-    tfp_sprintf(element->buff, "D2  %5d %5d %5d %5d", debug[4], debug[5], debug[6], debug[7]);
+    const char *label = stepResponseGetDebugLabel(1);
+    tfp_sprintf(element->buff, "%c%c%c %5d %5d %5d %5d", label[0], label[1] ? label[1] : ' ', label[2] ? label[2] : ' ', debug[4], debug[5], debug[6], debug[7]);
 }
 
 static void osdElementDisarmed(osdElementParms_t *element)

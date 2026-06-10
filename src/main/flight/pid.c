@@ -49,6 +49,8 @@
 #include "flight/gps_rescue.h"
 #include "flight/imu.h"
 #include "flight/mixer.h"
+#include "flight/rpm_filter.h"
+#include "flight/step_response.h"
 
 #include "io/gps.h"
 
@@ -169,7 +171,7 @@ void resetPidProfile(pidProfile_t *pidProfile)
             // NOTE: dynamic lpf is enabled by default so this setting is actually
             // overridden and the static lowpass 1 is disabled. We can't set this
             // value to 0 otherwise Configurator versions 10.4 and earlier will also
-            // reset the lowpass filter type to PT1 overriding the desired Butterworth setting.
+            // reset the lowpass filter type to PT1 overriding the desired BIQUAD setting.
         .dterm_lpf2_static_hz = DTERM_LPF2_HZ_DEFAULT,   // second Dterm LPF ON by default
         .dterm_lpf1_type = FILTER_PT1,
         .dterm_lpf2_type = FILTER_PT1,
@@ -1129,6 +1131,10 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
 
     rotateItermAndAxisError();
 
+#ifdef USE_RPM_FILTER
+    rpmFilterUpdate();
+#endif
+
     if (pidRuntime.useEzDisarm) {
         disarmOnImpact();
     }
@@ -1173,6 +1179,9 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
 #endif // USE_CHIRP
 
     // ----------PID controller----------
+#ifdef USE_STEP_RESPONSE_DEBUG
+    stepResponsePidLoopStart(currentTimeUs);
+#endif
     for (flight_dynamics_index_t axis = FD_ROLL; axis <= FD_YAW; ++axis) {
 
 #ifdef USE_CHIRP
@@ -1322,6 +1331,9 @@ void FAST_CODE pidController(const pidProfile_t *pidProfile, timeUs_t currentTim
         }
 #endif
         pidRuntime.previousPidSetpoint[axis] = currentPidSetpoint; // this is the value sent to blackbox, and used for D-max setpoint
+#ifdef USE_STEP_RESPONSE_DEBUG
+        stepResponseCapture(axis, currentPidSetpoint, gyroRate);
+#endif
 
         // disable D if launch control is active
         if ((pidRuntime.pidCoefficient[axis].Kd > 0) && !launchControlActive) {
@@ -1518,10 +1530,9 @@ void dynLpfDTermUpdate(float throttle)
                 pt1FilterUpdateCutoff(&pidRuntime.dtermLowpass[axis].pt1Filter, pt1FilterGain(cutoffFreq, pidRuntime.dT));
             }
             break;
-        case DYN_LPF_SVF:
-            cutoffFreq = MIN(cutoffFreq, 0.475f / pidRuntime.dT); // constrain to be below the nyquist
+        case DYN_LPF_BIQUAD:
             for (int axis = 0; axis < XYZ_AXIS_COUNT; axis++) {
-                svfLowpassFilterUpdate(&pidRuntime.dtermLowpass[axis].svfLowpassFilter, cutoffFreq, pidRuntime.dT);
+                biquadFilterUpdateLPF(&pidRuntime.dtermLowpass[axis].biquadFilter, cutoffFreq, targetPidLooptime);
             }
             break;
         case DYN_LPF_PT2:

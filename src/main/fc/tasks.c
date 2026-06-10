@@ -60,6 +60,7 @@
 #include "flight/pid.h"
 #include "flight/position.h"
 #include "flight/pos_hold.h"
+#include "flight/step_response.h"
 
 #include "io/asyncfatfs/asyncfatfs.h"
 #include "io/beeper.h"
@@ -136,16 +137,28 @@ static void taskMain(timeUs_t currentTimeUs)
 #endif
 }
 
+#ifdef USE_STEP_RESPONSE_DEBUG
+static bool taskStepResponseCheck(timeUs_t currentTimeUs, timeDelta_t currentDeltaTimeUs)
+{
+    return stepResponseUpdateCheck(currentTimeUs, currentDeltaTimeUs);
+}
+
+static void taskStepResponse(timeUs_t currentTimeUs)
+{
+    stepResponseUpdate(currentTimeUs);
+}
+#endif
+
 static void taskHandleSerial(timeUs_t currentTimeUs)
 {
 #if ENABLE_BF_OBL
-    // OBL armed IWDG before BXNS; refresh from TASK_SERIAL — the
-    // scheduler exempts TASK_SERIAL from the time-budget check so it
-    // always runs at its nominal rate. If scheduler itself wedges,
-    // refresh stops, IWDG fires and OBL routes the next boot to DFU.
+    // OBL arms IWDG before jumping to BF. Refresh it from TASK_SERIAL —
+    // the scheduler exempts TASK_SERIAL from the time-budget check, so
+    // it's the one task we can rely on to be picked at its nominal rate.
+    // If the scheduler itself wedges, IWDG fires and OBL routes the next
+    // boot to DFU.
     BF_OBL_IWDG_REFRESH();
 #endif
-
     UNUSED(currentTimeUs);
 
 #if defined(USE_VCP)
@@ -384,6 +397,9 @@ task_attribute_t task_attributes[TASK_COUNT] = {
     [TASK_GYRO] = DEFINE_TASK("GYRO", NULL, NULL, taskGyroSample, TASK_GYROPID_DESIRED_PERIOD, TASK_PRIORITY_REALTIME),
     [TASK_FILTER] = DEFINE_TASK("FILTER", NULL, NULL, taskFiltering, TASK_GYROPID_DESIRED_PERIOD, TASK_PRIORITY_REALTIME),
     [TASK_PID] = DEFINE_TASK("PID", NULL, NULL, taskMainPidLoop, TASK_GYROPID_DESIRED_PERIOD, TASK_PRIORITY_REALTIME),
+#ifdef USE_STEP_RESPONSE_DEBUG
+    [TASK_STEP_RESPONSE] = DEFINE_TASK("STEPRESP", NULL, taskStepResponseCheck, taskStepResponse, TASK_PERIOD_HZ(STEP_RESPONSE_WORK_HZ), TASK_PRIORITY_LOW),
+#endif
 
 #ifdef USE_ACC
     [TASK_ACCEL] = DEFINE_TASK("ACC", NULL, NULL, taskUpdateAccelerometer, TASK_PERIOD_HZ(1000), TASK_PRIORITY_MEDIUM),
@@ -480,7 +496,7 @@ task_attribute_t task_attributes[TASK_COUNT] = {
     [TASK_OPTICALFLOW] = DEFINE_TASK("OPTICALFLOW", NULL, NULL, taskUpdateOpticalflow, TASK_PERIOD_HZ(10), TASK_PRIORITY_LOWEST),
 #endif
 #ifdef USE_CRSF_V3
-    [TASK_SPEED_NEGOTIATION] = DEFINE_TASK("SPEED_NEGOT'N", NULL, NULL, speedNegotiationProcess, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
+    [TASK_SPEED_NEGOTIATION] = DEFINE_TASK("SPEED_NEGOTIATION", NULL, NULL, speedNegotiationProcess, TASK_PERIOD_HZ(100), TASK_PRIORITY_LOW),
 #endif
 
 #ifdef USE_RC_STATS
@@ -551,6 +567,10 @@ void tasksInit(void)
         setTaskEnabled(TASK_PID, true);
         schedulerEnableGyro();
     }
+
+#ifdef USE_STEP_RESPONSE_DEBUG
+    setTaskEnabled(TASK_STEP_RESPONSE, true);
+#endif
 
 #if defined(USE_ACC)
     if (sensors(SENSOR_ACC) && acc.sampleRateHz) {

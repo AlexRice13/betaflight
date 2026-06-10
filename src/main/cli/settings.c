@@ -65,6 +65,7 @@
 #include "flight/position.h"
 #include "flight/rpm_filter.h"
 #include "flight/servos.h"
+#include "flight/step_response.h"
 
 #include "io/beeper.h"
 #include "io/dashboard.h"
@@ -497,6 +498,12 @@ static const char * const lookupTableGyroFilterDebug[] = {
     "ROLL", "PITCH", "YAW"
 };
 
+#ifdef USE_STEP_RESPONSE_DEBUG
+static const char * const lookupTableStepResponseWindow[] = {
+    "HANN", "HAMMING", "RECT"
+};
+#endif
+
 static const char * const lookupTablePositionAltitudeSource[] = {
     "DEFAULT", "BARO_ONLY", "GPS_ONLY", "RANGEFINDER_PREFER", "RANGEFINDER_ONLY"
 };
@@ -694,6 +701,10 @@ const lookupTableEntry_t lookupTables[] = {
 
     LOOKUP_TABLE_ENTRY(lookupTableGyroFilterDebug),
 
+#ifdef USE_STEP_RESPONSE_DEBUG
+    LOOKUP_TABLE_ENTRY(lookupTableStepResponseWindow),
+#endif
+
     LOOKUP_TABLE_ENTRY(lookupTablePositionAltitudeSource),
     LOOKUP_TABLE_ENTRY(lookupTableOffOnAuto),
     LOOKUP_TABLE_ENTRY(lookupTableFeedforwardAveraging),
@@ -794,6 +805,25 @@ const clivalue_t valueTable[] = {
     { "gyro_lpf1_dyn_expo",         VAR_UINT8  | MASTER_VALUE, .config.minmaxUnsigned = { 0, 10 }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_lpf1_dyn_expo) },
 #endif
     { "gyro_filter_debug_axis",     VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_GYRO_FILTER_DEBUG }, PG_GYRO_CONFIG, offsetof(gyroConfig_t, gyro_filter_debug_axis) },
+
+#ifdef USE_STEP_RESPONSE_DEBUG
+// PG_STEP_RESPONSE_CONFIG
+    { "stepresp_expected_hz",              VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 1, 1000 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, expectedHz) },
+    { "stepresp_window_ms",                VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 100, 2000 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, windowMs) },
+    { "stepresp_response_ms",              VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 10, 256 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, responseMs) },
+    { "stepresp_min_input",                VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 0, 1000 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, minInput) },
+    { "stepresp_epsilon_x1e6",             VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 1, 10000 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, epsilon1e6) },
+    { "stepresp_window_type",              VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_STEP_RESPONSE_WINDOW }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, windowType) },
+    { "stepresp_settle_band_percent",      VAR_UINT8  | MASTER_VALUE,               .config.minmaxUnsigned = { 1, 100 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, settleBandPercent) },
+    { "stepresp_settle_hold_ms",           VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 1, 256 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, settleHoldMs) },
+    { "stepresp_settle_outlier_percent",   VAR_UINT8  | MASTER_VALUE,               .config.minmaxUnsigned = { 0, 100 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, settleOutlierPercent) },
+    { "stepresp_min_corr_percent",         VAR_UINT8  | MASTER_VALUE,               .config.minmaxUnsigned = { 0, 100 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, minCorrPercent) },
+    { "stepresp_band_min_hz",              VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 1, 500 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, bandMinHz) },
+    { "stepresp_band_max_hz",              VAR_UINT16 | MASTER_VALUE,               .config.minmaxUnsigned = { 1, 500 }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, bandMaxHz) },
+    { "stepresp_armed_only",               VAR_UINT8  | MASTER_VALUE | MODE_LOOKUP, .config.lookup = { TABLE_OFF_ON }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, armedOnly) },
+    { "stepresp_debug_label",              VAR_UINT8  | MASTER_VALUE | MODE_STRING, .config.string = { 1, STEP_RESPONSE_OSD_LABEL_LENGTH, STRING_FLAGS_NONE }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, debugLabel) },
+    { "stepresp_debug2_label",             VAR_UINT8  | MASTER_VALUE | MODE_STRING, .config.string = { 1, STEP_RESPONSE_OSD_LABEL_LENGTH, STRING_FLAGS_NONE }, PG_STEP_RESPONSE_CONFIG, offsetof(stepResponseConfig_t, debug2Label) },
+#endif
 
 // PG_ACCELEROMETER_CONFIG
 #if defined(USE_ACC)

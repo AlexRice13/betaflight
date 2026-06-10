@@ -202,5 +202,15 @@ SIZE_OPTIMISED_SRC += \
 
 DSP_LIB := $(LIB_MAIN_DIR)/CMSIS/DSP
 DEVICE_FLAGS += -DARM_MATH_MATRIX_CHECK -DARM_MATH_ROUNDING -D__FPU_PRESENT=1 -DUNALIGNED_SUPPORT_DISABLE -DARM_MATH_CM7
+DEVICE_FLAGS += -DUSE_STEP_RESPONSE_DEBUG
+
+STEP_RESPONSE_DSP_SRC += \
+            $(DSP_LIB)/Source/CommonTables/arm_common_tables.c \
+            $(DSP_LIB)/Source/CommonTables/arm_const_structs.c \
+            $(DSP_LIB)/Source/TransformFunctions/arm_bitreversal.c \
+            $(DSP_LIB)/Source/TransformFunctions/arm_cfft_f32.c \
+            $(DSP_LIB)/Source/TransformFunctions/arm_cfft_radix8_f32.c \
+            $(DSP_LIB)/Source/TransformFunctions/arm_rfft_fast_f32.c \
+            $(DSP_LIB)/Source/TransformFunctions/arm_rfft_fast_init_f32.c
 
 include $(TARGET_PLATFORM_DIR)/mk/STM32_COMMON.mk

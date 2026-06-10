@@ -198,6 +198,9 @@ typedef enum {
 #if ENABLE_DRONECAN
     TASK_DRONECAN,
 #endif
+#ifdef USE_STEP_RESPONSE_DEBUG
+    TASK_STEP_RESPONSE,
+#endif
 
     /* Count of real tasks */
     TASK_COUNT,
